@@ -9,13 +9,17 @@ device model.
 import typing
 
 import functools
+import os
 
-from conda import plugins
 import cuda.core.experimental as ccx
+from conda import plugins
 
 
 def get_minimum_sm() -> tuple[str, typing.Union[None, str]]:
     """Try to detect the minimum SM of CUDA devices on the system."""
+    if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
+        return os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip() or "0.0", "None"
+
     minimum_sm_major: int = 999
     minimum_sm_minor: int = 999
     device_name: str = "None"
