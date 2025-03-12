@@ -42,7 +42,7 @@ packages = [
 ]
 
 # Pypi classifiers: https://pypi.org/classifiers/
-classifiers = [  # UPDATEME with additional classifiers
+classifiers = [
   "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
@@ -101,44 +101,6 @@ docstring-code-line-length = 79
 skip-magic-trailing-comma = true
 
 [tool.ruff.lint]
-select = [  # UPDATEME with additional rules from https://docs.astral.sh/ruff/rules/
-  "F",
-  "E",
-  "W",
-  "I",
-  "N",
-  "D",
-  "S",
-  "B",
-  "UP",
-  "C90",
-  "T20",
-  "EM",
-  "PL",
-  "C4",
-  "PT",
-  "TD",
-  "ANN",
-  "ICN",
-  "RET",
-  "ISC",
-  "RSE",
-  "ARG",
-  "FBT",
-  "SIM",
-  "TID",
-  "PTH",
-  "TCH",
-  "FIX",
-  "BLE",
-  "ERA",
-  "TRY",
-  "FLY",
-  "YTT",
-  "CPY",
-  "RUF",
-]
-ignore = ["D200"]
 task-tags = [
   "BUG",
   "HACK",
