@@ -1,0 +1,118 @@
+{
+    "files.exclude": {
+        "**/__pycache__": true,
+        "**/.ipynb_checkpoints": true
+    },
+    "editor.lineNumbers": "relative",
+    "editor.rulers": [88],
+    "editor.scrollBeyondLastLine": false,
+    "editor.cursorStyle": "underline",
+    "terminal.integrated.persistentSessionReviveProcess": "never",
+    "terminal.integrated.enablePersistentSessions": false,
+    "workbench.localHistory.enabled": false,
+    "workbench.editor.enablePreview": false,
+    "workbench.settings.editor": "json",
+	"workbench.editor.closeOnFileDelete": true,
+	"workbench.startupEditor": "readme",
+    "git.suggestSmartCommit": false,
+    "git.allowNoVerifyCommit": false,
+	"git.closeDiffOnOperation": true,
+    "git.pruneOnFetch": true,
+	"git.pullBeforeCheckout": true,
+    "diffEditor.renderSideBySide": true,
+    "diffEditor.ignoreTrimWhitespace": false,
+    "debug.toolBarLocation": "docked",
+	"debug.terminal.clearBeforeReusing": true,
+	"debug.showVariableTypes": true,
+    "explorer.autoReveal": true,
+    "python.terminal.activateEnvInCurrentTerminal": true,
+	"python.terminal.activateEnvironment": true,
+    "python.testing.unittestEnabled": false,
+    "python.testing.pytestEnabled": true,
+    "python.testing.pytestArgs": [
+        "--strict-markers",
+        "--tb=short",
+        "--doctest-modules",
+        "--doctest-continue-on-failure",
+        "--pikachu",
+        "--cov=nvidia_virtual_packages",
+        "--cov-config=pyproject.toml"
+    ],
+    "[python]": {
+        "editor.bracketPairColorization.enabled": false
+    },
+    "[markdown]": {
+        "editor.tabSize": 2
+    },
+    "[dockerfile]": {
+        "editor.tabSize": 2
+    },
+    "todo-tree.tree.labelFormat": "${after}",
+    "todo-tree.highlights.defaultHighlight": {
+        "foreground": "#444444",
+        "background": "#FFFFFF",
+        "fontWeight": "bold",
+    },
+    "todo-tree.highlights.customHighlight": {
+        "TODO": {
+            "icon": "alert",
+            "iconColour": "#e69b39"
+        },
+        "CHECKLIST": {
+            "icon": "tasklist",
+            "iconColour": "#39e673"
+        },
+        "UPDATEME": {
+            "icon": "pencil",
+            "iconColour": "#e65339"
+        },
+        "BUG": {
+            "icon": "bug",
+            "iconColour": "#e63946",
+            "foreground": "#e63946"
+        },
+        "REFACTOR": {
+            "icon": "issue-reopened",
+            "iconColour": "#4a39e6",
+            "foreground": "#4a39e6"
+        },
+        "FIXME": {
+            "icon": "tools",
+            "iconColour": "#e63946",
+            "foreground": "#e63946"
+        },
+        "HACK": {
+            "icon": "cpu",
+            "iconColour": "#e6399e"
+        }
+    },
+    "todo-tree.general.tags": [
+        "BUG",
+        "HACK",
+        "FIXME",
+        "FIXIT",
+        "FIX",
+        "NEEDSWORK",
+        "UPDATEME",
+        "TODO",
+        "REFACTOR",
+        "[ ]"
+    ],
+    "todo-tree.general.tagGroups": {
+        "FIXME": [
+            "FIXME",
+            "FIXIT",
+            "FIX",
+            "NEEDSWORK"
+        ],
+        "CHECKLIST": [
+            "[ ]"
+        ]
+    },
+    "todo-tree.general.statusBar": "top three",
+    "todo-tree.general.showIconsInsteadOfTagsInStatusBar": true,
+    "todo-tree.filtering.excludeGlobs": [
+        "**/node_modules/*/**", // Default for todo-tree
+        "**/.github/PULL_REQUEST_TEMPLATE.md"
+    ]
+}

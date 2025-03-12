@@ -1,0 +1,275 @@
+# Poetry pyproject.toml: https://python-poetry.org/docs/pyproject/
+[project]
+name = "nvidia-virtual-packages"
+description = "Provides conda virtual packages for NVIDIA hardware."
+license = "Proprietary"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [
+  { name = "Daniel Ching", email = "dching@nvidia.com" },
+]
+maintainers = [
+  { name = "Daniel Ching", email = "dching@nvidia.com" },
+]
+keywords = ["conda", "virtual package", "archspec", "CUDA", "NVIDIA"]
+dynamic = ["version", "classifiers"]
+dependencies = [
+  "conda",
+  "cuda-core==0.1.*",
+]
+
+[project.entry-points.conda]
+cuda-arch = "nvidia_virtual_packages.cuda.arch"
+
+[project.urls]
+repository = "https://github.com/NVIDIA/nvidia-virtual-packages"
+homepage = "https://github.com/NVIDIA/nvidia-virtual-packages"
+"Work Item Tracker" = "https://github.com/NVIDIA/nvidia-virtual-packages/issues"
+"Contributing Guidelines" = "https://github.com/NVIDIA/nvidia-virtual-packages/tree/master/CONTRIBUTING.md"
+
+
+[build-system]
+requires = ["poetry_core>=1.0.0", "poetry-dynamic-versioning>=1.7.1,<2.0.0"]
+build-backend = "poetry_dynamic_versioning.backend"
+
+
+[tool.poetry]
+requires-poetry = ">=2.0"
+# Placeholder for poetry-dynamic-versioning, do not change:
+# https://github.com/mtkennerly/poetry-dynamic-versioning#installation
+packages = [
+  {include = "nvidia_virtual_packages"}
+]
+
+# Pypi classifiers: https://pypi.org/classifiers/
+classifiers = [  # UPDATEME with additional classifiers
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Private :: Do Not Upload"  # TODO Remove classifier to allow publishing on PyPI
+]
+version = "0.0.0"
+
+
+[tool.poetry.dependencies]
+python = "^3.9"
+
+
+[tool.poetry.group.dev.dependencies]
+invoke = "^2.2.0"
+mypy = "^1.14.1"
+mypy-extensions = "^1.0.0"
+pre-commit = "^4.1.0"
+bandit = "^1.8.2"
+safety = "^3.2.14"
+
+ruff = "^0.9.2"
+
+pytest = "^8.3.4"
+pytest-bdd = "^8.1.0"
+pytest-html = "^4.1.1"
+pytest-cov = "^6.0.0"
+pytest-mock = "^3.14.0"
+pytest-timeout = "^2.3.1"
+pytest-benchmark = "^5.1.0"
+pytest-sugar = "^1.0.0"
+pytest-pikachu = "^1.0.0"
+coverage = "^7.6.10"
+
+
+[tool.poetry.requires-plugins]
+poetry-dynamic-versioning = { version = "^1.7.1", extras = ["plugin"] }
+poetry-plugin-export = "^1.9.0"
+poetry-plugin-up = "^0.9.0"
+poetry-plugin-bundle = "^1.5.0"
+
+[tool.poetry-dynamic-versioning]
+enable = true
+
+
+[tool.ruff]
+# https://github.com/astral-sh/ruff
+# https://docs.astral.sh/ruff/settings
+output-format = "grouped"
+show-fixes = true
+target-version = "py39"
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 79
+skip-magic-trailing-comma = true
+
+[tool.ruff.lint]
+select = [  # UPDATEME with additional rules from https://docs.astral.sh/ruff/rules/
+  "F",
+  "E",
+  "W",
+  "I",
+  "N",
+  "D",
+  "S",
+  "B",
+  "UP",
+  "C90",
+  "T20",
+  "EM",
+  "PL",
+  "C4",
+  "PT",
+  "TD",
+  "ANN",
+  "ICN",
+  "RET",
+  "ISC",
+  "RSE",
+  "ARG",
+  "FBT",
+  "SIM",
+  "TID",
+  "PTH",
+  "TCH",
+  "FIX",
+  "BLE",
+  "ERA",
+  "TRY",
+  "FLY",
+  "YTT",
+  "CPY",
+  "RUF",
+]
+ignore = ["D200"]
+task-tags = [
+  "BUG",
+  "HACK",
+  "FIXME",
+  "FIXIT",
+  "FIX",
+  "NEEDSWORK",
+  "UPDATEME",
+  "TODO",
+  "REFACTOR"
+]  # UPDATEME by modifying or removing this setting after addressing all UPDATEMEs
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**.py" = ["D100", "D101", "D102", "D103", "D104", "S101"]
+"__main__.py" = ["D100", "D101"]
+
+[tool.ruff.lint.flake8-annotations]
+ignore-fully-untyped = true
+suppress-dummy-args = true
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
+
+[tool.ruff.lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[tool.ruff.lint.pycodestyle]
+max-line-length = 92
+max-doc-length = 92
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.ruff.lint.flake8-copyright]
+author = "NVIDIA"
+
+[tool.ruff.lint.pylint]
+max-bool-expr = 3
+
+[tool.ruff.lint.isort]
+split-on-trailing-comma = false
+known-first-party = ["nvidia_virtual_packages"]
+sections.typing = ["typing", "types", "typing_extensions", "mypy", "mypy_extensions"]
+sections.testing = ["pytest", "tests"]
+section-order = [
+  "future",
+  "typing",
+  "standard-library",
+  "third-party",
+  "first-party",
+  "local-folder",
+  "testing"
+]
+
+
+[tool.mypy]
+# https://github.com/python/mypy
+# https://mypy.readthedocs.io/en/latest/config_file.html#using-a-pyproject-toml-file
+python_version = 3.9
+files = [
+  "nvidia_virtual_packages",
+  "tests"
+]
+pretty = true
+show_traceback = true
+color_output = true
+
+allow_redefinition = false
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_incomplete_defs = true
+explicit_package_bases = true
+ignore_missing_imports = true
+no_implicit_reexport = true
+implicit_optional = false
+show_column_numbers = true
+show_error_context = true
+strict_equality = true
+warn_redundant_casts = true
+warn_return_any = true
+warn_unreachable = true
+warn_unused_configs = true
+warn_unused_ignores = true
+
+
+[tool.pytest.ini_options]
+# https://github.com/pytest-dev/pytest
+# https://docs.pytest.org/en/6.2.x/customize.html#pyproject-toml
+# Directories that are not visited by pytest collector:
+norecursedirs =[
+  "hooks",
+  "*.egg",
+  ".eggs",
+  "dist",
+  "build",
+  "docs",
+  ".tox",
+  ".git",
+  "__pycache__"
+]
+doctest_optionflags = ["NUMBER", "NORMALIZE_WHITESPACE", "IGNORE_EXCEPTION_DETAIL"]
+timeout = 10
+bdd_features_base_dir = "features/"
+
+# Extra options:
+addopts = [
+  "--strict-markers",
+  "--tb=short",
+  "--doctest-modules",
+  "--doctest-continue-on-failure",
+  "--pikachu",
+  "--cov=nvidia_virtual_packages",
+  "--cov-config=pyproject.toml",
+  "--junitxml=test_report.xml"
+]
+
+
+[tool.coverage.run]
+source = ["tests"]
+branch = true
+
+
+[tool.coverage.report]
+exclude_also = [
+  "def main",
+  "if __name__ == .__main__.:"
+]
+fail_under = 50
+show_missing = true
+
+
+[tool.coverage.paths]
+source = ["nvidia_virtual_packages"]
