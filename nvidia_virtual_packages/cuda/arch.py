@@ -4,6 +4,9 @@ The virtual package will be `__cuda_arch`, and will provide the minimum SM of CU
 detected on the system. The version will be the SM version and the build string will be the
 device model.
 
+This implementation is based on cuda.core which returns both major and minor compute
+capability. nvidia-ml-py is also an option, but only returns the major compute capability
+which means you couldn't tune at compile time to a minor architecture.
 """
 
 import typing
@@ -18,7 +21,8 @@ from conda import plugins
 def get_minimum_sm() -> tuple[str, typing.Union[None, str]]:
     """Try to detect the minimum SM of CUDA devices on the system."""
     if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
-        return os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip() or "0.0", "None"
+        override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip().split('=')
+        return override[0] or "0.0", None if len(override) < 2 else override[1]
 
     minimum_sm_major: int = 999
     minimum_sm_minor: int = 999
@@ -29,6 +33,7 @@ def get_minimum_sm() -> tuple[str, typing.Union[None, str]]:
             and device.compute_capability.minor < minimum_sm_minor
         ):
             minimum_sm_major = device.compute_capability.major
+            # FIXME: How to handle those special devices such as 9.0a?
             minimum_sm_minor = device.compute_capability.minor
             device_name = device.name
     stripped_name = device_name.replace(" ", "").replace("NVIDIA", "")

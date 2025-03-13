@@ -10,12 +10,28 @@ devices.
 
 ## Implementing a conda-recipe which depends on `__cuda_arch`
 
-Define a file namedd `conda_build_config.yaml` to tell conda-build to build the recipe
-multiple times. This file will need variables which provide the compiler flags, compute
-capabilities, and priority of each package variant.
+Define a `conda_build_config.yaml` to configure conda-build to build the recipe multiple
+times. This file will need variables providing the compiler flags, compute capabilities, and
+priority for each package variant.
 
 In this example, we assume the build system is using CMake, so setting the `CUDAARCHS`
 environment variable will tell CMake which compute capabilities to target.
+
+In this example, we have three variants. One variant is built for the major versions 5
+through 7, so it should be able to run on any device with compute capability `>=5,<8`. One
+variant is built for compute capability 8.2 only. One variant is built for compute
+capability 7.0, but it includes PTX, so it can run on any device with higher computer
+capability as well.
+
+> [!IMPORTANT]
+> All packages should declare compatability with `__cuda_arch=0` so that the packages may be
+> installed into the test environment of a GPU-less build runner.
+
+In this example, we have ranked the priority of the variants from most specific to least
+specific so that users get the most optimized code for their device. This example is a bit
+contrived, and it's probably not good practive to have multiple variants which are
+compatible with a device. Priority is not needed if only one variant is compatible with
+every possible compute capability.
 
 ```yaml
 # conda_build_config.yaml
@@ -24,19 +40,19 @@ environment variable will tell CMake which compute capabilities to target.
 CUDAARCHS:
   - "50-real;60-real;70-real"
   - "82-real"
-  - "80-real;80-virtual"
+  - "70-real;70-virtual"
 
 # Just for illustration, the equivalent args for pytorch would be
 TORCH_CUDA_ARCH_LIST:
   - "5.0 6.0 7.0"
   - "8.2"
-  - "8.0+PTX"
+  - "7.0+PTX"
 
 # These strings define the corresponding compatible compute capabilities
 __cuda_arch:
-  - ">=5.0,<8.0"
-  - "8.2"
-  - ">=8.0"
+  - "0 | >=5,<8"
+  - "0 | 8.2.*"
+  - "0 | >=6"
 
 # We should rank the variants in case multiple variants are valid on a user's machine
 priority:
@@ -84,3 +100,6 @@ requirements:
     - __cuda_arch {{ __cuda_arch }}
 
 ```
+
+Finally, when building these package, we must set `CONDA_OVERRIDE_CUDA_ARCH="0"` so that our
+build runner can test all variants of the package.
