@@ -1,0 +1,19 @@
+CUDAARCHS:
+  - "50-real;60-real;70-real"
+  - "82-real"
+  - "80-real;80-virtual"
+
+__cuda_arch:
+  - "0 | >=5,<8"
+  - "0 | 8.2.*"
+  - "0 | >=8"
+
+priority:
+  - 0
+  - 2
+  - 1
+
+zip_keys:
+  - __cuda_arch
+  - CUDAARCHS
+  - priority

@@ -1,0 +1,25 @@
+
+{% set build = 0 %}
+
+package:
+  name: "cuda-archs-test-package"
+  version: "1.0.0"
+
+build:
+  number: {{ build + priority | int * 100 }}
+
+env:
+  - CUDAARCHS={{ CUDAARCHS }}
+
+requirements:
+  # build:
+  #   - {{ compiler('c') }}
+  #   - {{ compiler('cxx') }}
+  #   - {{ compiler('cuda') }}
+  #   - {{ stdlib('c') }}
+  run:
+    - __cuda_arch {{ __cuda_arch }}
+
+test:
+  commands:
+    - hello.sh
