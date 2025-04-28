@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 """Define a virtual package exposing the arch of CUDA devices on the system.
 
 The virtual package will be `__cuda_arch`, and will provide the minimum SM of CUDA devices
