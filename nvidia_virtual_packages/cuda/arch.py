@@ -1,3 +1,5 @@
+# SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
 """Define a virtual package exposing the arch of CUDA devices on the system.
 
 The virtual package will be `__cuda_arch`, and will provide the minimum SM of CUDA devices
@@ -21,7 +23,7 @@ from conda import plugins
 def get_minimum_sm() -> tuple[str, typing.Union[None, str]]:
     """Try to detect the minimum SM of CUDA devices on the system."""
     if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
-        override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip().split('=')
+        override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip().split("=")
         return override[0] or "0.0", None if len(override) < 2 else override[1]
 
     minimum_sm_major: int = 999
