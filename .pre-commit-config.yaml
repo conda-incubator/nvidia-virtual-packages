@@ -21,3 +21,10 @@ repos:
       - id: mypy
         args: ["--config-file", "pyproject.toml"]
         files: ^nvidia_virtual_packages(.*)\.py$
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: "v2.4.1"
+    hooks:
+      - id: codespell
+        additional_dependencies:
+          - tomli
