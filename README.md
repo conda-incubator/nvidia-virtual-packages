@@ -4,7 +4,7 @@ A conda plugin which creates NVIDIA-specific virtual packages
 
 The `__cuda_arch` virtual package provides the minimum compute capability of the available
 CUDA devices detected on the system and the model description of the same device. This
-virtual package may be used to enforce a mininmum compute capability for a conda package or
+virtual package may be used to enforce a minimum compute capability for a conda package or
 build multiple variants of a conda package which each target one or a subset of CUDA
 devices.
 
@@ -24,12 +24,12 @@ capability 7.0, but it includes PTX, so it can run on any device with higher com
 capability as well.
 
 > [!IMPORTANT]
-> All packages should declare compatability with `__cuda_arch=0` so that the packages may be
+> All packages should declare compatibility with `__cuda_arch=0` so that the packages may be
 > installed into the test environment of a GPU-less build runner.
 
 In this example, we have ranked the priority of the variants from most specific to least
 specific so that users get the most optimized code for their device. This example is a bit
-contrived, and it's probably not good practive to have multiple variants which are
+contrived, and it's probably not good practice to have multiple variants which are
 compatible with a device. Priority is not needed if only one variant is compatible with
 every possible compute capability.
 
@@ -52,9 +52,9 @@ TORCH_CUDA_ARCH_LIST:
 __cuda_arch:
   - "0 | >=5,<8"
   - "0 | 8.2.*"
-  - "0 | >=6"
+  - "0 | >=7"
 
-# We should rank the variants in case multiple variants are valid on a user's machine
+# We should rank the variants in case multiple variants match a user's machine
 priority:
   - 0
   - 2

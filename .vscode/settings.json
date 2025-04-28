@@ -3,7 +3,6 @@
         "**/__pycache__": true,
         "**/.ipynb_checkpoints": true
     },
-    "editor.lineNumbers": "relative",
     "editor.rulers": [88],
     "editor.scrollBeyondLastLine": false,
     "terminal.integrated.persistentSessionReviveProcess": "never",

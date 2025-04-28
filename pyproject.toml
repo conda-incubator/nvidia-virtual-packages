@@ -2,7 +2,7 @@
 [project]
 name = "nvidia-virtual-packages"
 description = "Provides conda virtual packages for NVIDIA hardware."
-license = "Proprietary"
+license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.9"
 authors = [
