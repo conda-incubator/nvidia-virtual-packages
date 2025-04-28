@@ -29,7 +29,7 @@ capability as well.
 
 In this example, we have ranked the priority of the variants from most specific to least
 specific so that users get the most optimized code for their device. This example is a bit
-contrived, and it's probably not good practive to have multiple variants which are
+contrived, and it's probably not good practice to have multiple variants which are
 compatible with a device. Priority is not needed if only one variant is compatible with
 every possible compute capability.
 
@@ -52,9 +52,9 @@ TORCH_CUDA_ARCH_LIST:
 __cuda_arch:
   - "0 | >=5,<8"
   - "0 | 8.2.*"
-  - "0 | >=6"
+  - "0 | >=7"
 
-# We should rank the variants in case multiple variants are valid on a user's machine
+# We should rank the variants in case multiple variants match a user's machine
 priority:
   - 0
   - 2
