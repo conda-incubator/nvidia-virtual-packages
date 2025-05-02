@@ -124,7 +124,6 @@ def get_minimum_sm() -> tuple[str, typing.Union[None, str]]:
             and compute_capability_minor < minimum_sm_minor
         ):
             minimum_sm_major = compute_capability_major
-            # FIXME: How to handle those special devices such as 9.0a?
             minimum_sm_minor = compute_capability_minor
             device_name = name
     stripped_name = device_name.replace(" ", "").replace("NVIDIA", "")
