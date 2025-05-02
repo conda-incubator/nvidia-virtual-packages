@@ -15,7 +15,6 @@ keywords = ["conda", "virtual package", "archspec", "CUDA", "NVIDIA"]
 dynamic = ["version", "classifiers"]
 dependencies = [
   "conda",
-  "cuda-core==0.1.*",
 ]
 
 [project.entry-points.conda]
