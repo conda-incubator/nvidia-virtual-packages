@@ -8,6 +8,39 @@ This virtual package may be used to enforce a minimum compute capability for a c
 or build multiple variants of a conda package which each target one or a subset of CUDA
 devices.
 
+Similar to how the virtual package `__cuda` constrains the `cuda-version` metapackage to
+represents to conda the CUDA *driver* version available on the system. This plugin creates a
+the virtual package `__cuda_arch` which constrains the `cuda-arch` metapackage which
+represents to conda the minimum compute capability of all CUDA *devices* on the system.
+
+## The `cuda-arch` metapackage
+
+Recipes and packages cannot depend on a specific version of `__cuda` or `__cuda_arch`
+directly we need to be able to build multiple variants of a package on the same machine
+without changing the hardware or driver. Creating a wrapper metapackage like `cuda-version`
+or `cuda-arch` which is only `run_constrained` by the corresponding virtual package lets us
+do this.
+
+> [!IMPORTANT]
+> This plugin does not create the `cuda-arch` metapackage. This package must be created
+> separately and published to the channel.
+
+The recipe for `cuda-arch` looks like this:
+
+```yaml
+package:
+  name: cuda-arch
+  version: {{ version }}
+
+requirements:
+  run_constrained:
+    - __cuda_arch {{ version }}
+```
+
+One version is published for every known major-minor compute capability. Sub-architectures
+such as `100f` are not expressable within this framework but can still be targeted at build
+time.
+
 ## Implementing a conda-recipe which depends on `__cuda_arch`
 
 Define a `conda_build_config.yaml` to configure conda-build to build the recipe multiple
@@ -49,10 +82,10 @@ TORCH_CUDA_ARCH_LIST:
   - "5.0 6.0+PTX"
 
 # These strings define the corresponding compatible compute capabilities
-__cuda_arch:
-  - ">=8.2"
-  - ">=7"
-  - ">=5"
+cuda_arch_min:
+  - "8.2"
+  - "7.0"
+  - "5.0"
 
 # We should rank the variants in case multiple variants match a user's machine
 # Higher numbers are higher priority
@@ -62,14 +95,14 @@ priority:
   - 0
 
 zip_keys:
-  - __cuda_arch
+  - cuda_arch_min
   - CUDAARCHS
   - priority
 ```
 
 In the recipe, we need to augment the build number according to install priority, pass the
 compiler flags to the build environment as an environment variable, and set the
-`__cuda_arch` package as run and host dependencies.
+`cuda-arch` package as run and host dependencies.
 
 ```yaml
 # meta.yaml
@@ -94,16 +127,13 @@ requirements:
     - {{ compiler('cuda') }}
     - {{ stdlib('c') }}
   host:
-  # FIXME: Use a metapackage to implement strong run_exports instead?
-  # TODO: Does it really matter if the host environment has the same __cuda_arch?
-    - __cuda_arch {{ __cuda_arch }}
+  # We must pin cuda-arch in the host environment to ensure that dependencies are also
+  # compatible with the desired cuda-arch
+    - cuda-arch {{ cuda_arch_min }}
   run:
-    - __cuda_arch {{ __cuda_arch }}
+    - cuda-arch >={{ cuda_arch_min }}
 
 ```
-
-Finally, when building these package, we must set `CONDA_OVERRIDE_CUDA_ARCH="999"` so that
-our build runner can test all variants of the package.
 
 ## What about arch-specific- and family- instructions sets such as 90a and 120f?
 
@@ -122,8 +152,8 @@ For example, here were are targeting both family and specific instruction sets:
 CUDAARCHS:
   - "80-real;90a-real;100a-real;100f-real;100-virtual"
 
-__cuda_arch:
-  - "0 | >=8"
+cuda_arch_min:
+  - "8.0"
 ```
 
 Notee that we have included `100-virtual` in order to provide forward-compatability.
