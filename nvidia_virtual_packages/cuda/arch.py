@@ -19,6 +19,7 @@ import typing
 from conda import plugins
 
 
+library: typing.Union[ctypes.WinDLL, ctypes.CDLL]
 if os.name == "nt":
     library = ctypes.WinDLL(ctypes.util.find_library("nvcuda"))
 elif os.name == "posix":

@@ -2,7 +2,13 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import logging
 
-from nvidia_virtual_packages.cuda.arch import *
+from nvidia_virtual_packages.cuda.arch import (
+    library,
+    driver_get_version,
+    init_driver,
+    device_get_count,
+    device_get_attributes,
+)
 
 logger = logging.getLogger(__name__)
 
