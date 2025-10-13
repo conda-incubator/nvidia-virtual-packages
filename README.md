@@ -38,7 +38,7 @@ requirements:
 ```
 
 One version is published for every known major-minor compute capability. Sub-architectures
-such as `100f` are not expressable within this framework but can still be targeted at build
+such as `100f` are not expressible within this framework but can still be targeted at build
 time.
 
 ## Implementing a conda-recipe which depends on `__cuda_arch`
