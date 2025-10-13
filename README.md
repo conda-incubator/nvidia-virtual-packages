@@ -156,7 +156,7 @@ cuda_arch_min:
   - "8.0"
 ```
 
-Notee that we have included `100-virtual` in order to provide forward-compatability.
+Note that we have included `100-virtual` in order to provide forward-compatability.
 `90-virtual` is not needed because any devices which `90-virtual` would run on also support
 `90a-real` or `100-virtual`. Future devices may not support `100a-real` or `100f-real`, but
 will support `100-virtual`.
