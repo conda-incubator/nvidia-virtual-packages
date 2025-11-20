@@ -14,6 +14,7 @@ import ctypes.util
 import enum
 import functools
 import os
+import re
 import typing
 
 from conda import plugins
@@ -126,7 +127,9 @@ def get_minimum_sm() -> tuple[str, typing.Union[None, str]]:
             minimum_sm_major = compute_capability_major
             minimum_sm_minor = compute_capability_minor
             device_name = name
-    stripped_name = device_name.replace(" ", "").replace("NVIDIA", "")
+    # Strip out all characters disallowed by CEP-26 and replace "NVIDIA" with an empty
+    # string to save space. Limit the length to 64 characters because of CEP-26.
+    stripped_name = re.sub(r"[^a-zA-Z0-9_.+]", "", device_name).replace("NVIDIA", "")[:64]
     # FIXME: Figure out what to do if any of the queries fail
     return f"{minimum_sm_major}.{minimum_sm_minor}", stripped_name
 
