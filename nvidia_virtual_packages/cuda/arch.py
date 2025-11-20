@@ -16,6 +16,7 @@ import functools
 import os
 import re
 import typing
+import warnings
 
 from conda import plugins
 
@@ -104,12 +105,35 @@ def device_get_attributes(device: int) -> tuple[int, int, str]:
         raise RuntimeError(f"Failed to get CUDA device name: {status}")
     return (cc_major.value, cc_minor.value, name.value.decode("utf-8"))
 
-
 def get_minimum_sm() -> tuple[str, typing.Union[None, str]]:
     """Try to detect the minimum SM of CUDA devices on the system."""
+
+    default_sm, default_name = "0", None
+    example_override = "Overrides must be of the form: CONDA_OVERRIDE_CUDA_ARCH=0.1 or CONDA_OVERRIDE_CUDA_ARCH=0.1=RTX2345DeviceModelName"
+
     if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
         override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip().split("=")
-        return override[0] or "0.0", None if len(override) < 2 else override[1]
+        if not re.fullmatch(r"^[0-9]+\.[0-9]+$", override[0]):
+            warnings.warn(
+                f"Invalid compute capability ({override[0]}) provided in CONDA_OVERRIDE_CUDA_ARCH. "
+                f"The default capability and model of '{default_sm}={default_name}' will be used instead. "
+                f"{example_override}"
+            )
+            return default_sm, default_name
+        else:
+            sm = override[0]
+        if len(override) < 2:
+            name = default_name
+        elif not re.fullmatch(r"[a-zA-Z0-9_.+]*", override[1]):
+            warnings.warn(
+                f"Invalid device model ({override[1]}) provided in CONDA_OVERRIDE_CUDA_ARCH. "
+                f"The default model of '{sm}={default_name}' will be used instead. "
+                f"{example_override}"
+            )
+            name = default_name
+        else:
+            name = override[1]
+        return sm, name
 
     init_driver()
 
@@ -132,7 +156,6 @@ def get_minimum_sm() -> tuple[str, typing.Union[None, str]]:
     stripped_name = re.sub(r"[^a-zA-Z0-9_.+]", "", device_name).replace("NVIDIA", "")[:64]
     # FIXME: Figure out what to do if any of the queries fail
     return f"{minimum_sm_major}.{minimum_sm_minor}", stripped_name
-
 
 @functools.cache
 def cached_minimum_sm():
