@@ -34,7 +34,7 @@ package:
 
 build:
   run_exports:
-    cuda-arch >={{ version }}
+    - cuda-arch >={{ version }}
 
 requirements:
   run_constrained:
