@@ -153,7 +153,7 @@ def get_minimum_sm() -> tuple[str, str]:
             device_name = name
     # Strip out all characters disallowed by CEP-26 and replace "NVIDIA" with an empty
     # string to save space. Limit the length to 64 characters because of CEP-26.
-    stripped_name = re.sub(r"[^a-zA-Z0-9_.+]", "", device_name).replace("NVIDIA", "")[:64]
+    stripped_name = re.sub("NVIDIA", "", re.sub(r"[^a-zA-Z0-9]", "", device_name), flags=re.IGNORECASE)[:64]
     # FIXME: Figure out what to do if any of the queries fail
     return f"{minimum_sm_major}.{minimum_sm_minor}", stripped_name
 
