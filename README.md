@@ -32,6 +32,10 @@ package:
   name: cuda-arch
   version: {{ version }}
 
+build:
+  run_exports:
+    cuda-arch >={{ version }}
+
 requirements:
   run_constrained:
     - __cuda_arch {{ version }}
@@ -127,11 +131,9 @@ requirements:
     - {{ compiler('cuda') }}
     - {{ stdlib('c') }}
   host:
-  # We must pin cuda-arch in the host environment to ensure that dependencies are also
-  # compatible with the desired cuda-arch
+  # We must pin cuda-arch in the host environment to the minimum supported cuda-arch to
+  # ensure that dependencies are also compatible with the minimum supported cuda-arch
     - cuda-arch {{ cuda_arch_min }}
-  run:
-    - cuda-arch >={{ cuda_arch_min }}
 
 ```
 
