@@ -105,10 +105,10 @@ def device_get_attributes(device: int) -> tuple[int, int, str]:
         raise RuntimeError(f"Failed to get CUDA device name: {status}")
     return (cc_major.value, cc_minor.value, name.value.decode("utf-8"))
 
-def get_minimum_sm() -> tuple[str, typing.Union[None, str]]:
+def get_minimum_sm() -> tuple[str, str]:
     """Try to detect the minimum SM of CUDA devices on the system."""
 
-    default_sm, default_name = "0", None
+    default_sm, default_name = "0", "0"
     example_override = "Overrides must be of the form: CONDA_OVERRIDE_CUDA_ARCH=0.1 or CONDA_OVERRIDE_CUDA_ARCH=0.1=RTX2345DeviceModelName"
 
     if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
@@ -139,7 +139,7 @@ def get_minimum_sm() -> tuple[str, typing.Union[None, str]]:
 
     minimum_sm_major: int = 999
     minimum_sm_minor: int = 999
-    device_name: str = "None"
+    device_name: str = default_name
     for device in range(device_get_count()):
         compute_capability_major, compute_capability_minor, name = (
             device_get_attributes(device)
