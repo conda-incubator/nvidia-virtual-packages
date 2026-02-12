@@ -2,11 +2,31 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Define a virtual package exposing the arch of CUDA devices on the system.
 
-The virtual package will be `__cuda_arch`, and will provide the minimum SM of CUDA devices
-detected on the system. The version will be the SM version and the build string will be the
-device model.
-
 This implementation uses ctypes to call the CUDA driver API.
+
+# Specification
+
+The virtual package MUST be named `__cuda_arch`.
+
+The virtual package MUST be present when a CUDA device is detected. For systems without CUDA
+devices (maybe driver is installed but no devices are present) the virtual package MUST NOT
+be present.
+
+When available, the version value MUST be set to the lowest compute capability of all CUDA
+devices detected on the system, formatted as {major}.{minor}; subarchitecture letters (a,f)
+excluded.
+
+When available, the build string MUST be the device model of the lowest compute capability
+device as reported by cuDeviceGetName with chars except for [a-zA-Z0-9] removed, "NVIDIA"
+replaced with an empty string, then limited to 64 characters.
+
+If the CONDA_OVERRIDE_CUDA_ARCH environment variable is set to a non-empty value that can be
+parsed as a compute capability string, the __cuda_arch virtual package MUST be exposed with
+that version with the build string set to "0".
+
+If the CONDA_OVERRIDE_CUDA_ARCH environment variable is set to a non-empty value that can be
+parsed as a compute capability string, the __cuda_arch virtual package MUST be exposed with
+that version with the build string set to "0".
 """
 
 import ctypes
