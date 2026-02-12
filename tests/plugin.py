@@ -2,9 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import logging
 
-from nvidia_virtual_packages.cuda.arch import (
-    get_minimum_sm,
-)
+from nvidia_virtual_packages.cuda.arch import get_minimum_sm
 
 logger = logging.getLogger(__name__)
 
