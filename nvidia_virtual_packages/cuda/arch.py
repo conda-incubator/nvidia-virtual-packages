@@ -32,20 +32,18 @@ that version with the build string set to "0".
 import ctypes
 import ctypes.util
 import enum
-import functools
 import os
 import re
+import typing
 import warnings
 
 from conda import plugins
 
-
+# WinDLL only exists on Windows; use a type alias based on platform so annotations work everywhere.
 if os.name == "nt":
-    library = ctypes.WinDLL(ctypes.util.find_library("nvcuda"))
-elif os.name == "posix":
-    library = ctypes.CDLL(ctypes.util.find_library("cuda"))
+    DLL: typing.TypeAlias = ctypes.WinDLL  # type: ignore
 else:
-    raise RuntimeError(f"Unsupported OS: {os.name}")
+    DLL: typing.TypeAlias = ctypes.CDLL  # type: ignore
 
 
 class CUresult(enum.IntEnum):
@@ -57,34 +55,49 @@ class CUdevice_attribute(enum.IntEnum):
     CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR = 76
 
 
-library.cuDriverGetVersion.argtypes = [ctypes.POINTER(ctypes.c_int)]
-library.cuDriverGetVersion.restype = ctypes.c_int
-library.cuInit.argtypes = [ctypes.c_uint]
-library.cuInit.restype = ctypes.c_int
-library.cuDeviceGetCount.argtypes = [ctypes.POINTER(ctypes.c_int)]
-library.cuDeviceGetCount.restype = ctypes.c_int
-library.cuDeviceGetAttribute.argtypes = [
-    ctypes.POINTER(ctypes.c_int),
-    ctypes.c_int,
-    ctypes.c_int,
-]
-library.cuDeviceGetAttribute.restype = ctypes.c_int
-library.cuDeviceGetName.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
-library.cuDeviceGetName.restype = ctypes.c_int
-
-
 class NVIDIAVirtualPackageError(RuntimeError):
     """A unique RuntimeError for NVIDIA virtual package errors, so we can catch errors specific to this plugin."""
 
 
-def init_driver():
+def init_driver() -> DLL:
     """Initialize the CUDA driver API"""
+
+    if os.name == "nt":
+        library_path = ctypes.util.find_library("nvcuda")
+        if library_path is None:
+            raise NVIDIAVirtualPackageError("Failed to find nvcuda library")
+        library = ctypes.WinDLL(library_path)  # type: ignore[unused-ignore,attr-defined]
+    elif os.name == "posix":
+        library_path = ctypes.util.find_library("cuda")
+        if library_path is None:
+            raise NVIDIAVirtualPackageError("Failed to find cuda library")
+        library = ctypes.CDLL(library_path)  # type: ignore[unused-ignore,attr-defined]
+    else:
+        raise NVIDIAVirtualPackageError(f"Unsupported OS: {os.name}")
+
+    library.cuDriverGetVersion.argtypes = [ctypes.POINTER(ctypes.c_int)]
+    library.cuDriverGetVersion.restype = ctypes.c_int
+    library.cuInit.argtypes = [ctypes.c_uint]
+    library.cuInit.restype = ctypes.c_int
+    library.cuDeviceGetCount.argtypes = [ctypes.POINTER(ctypes.c_int)]
+    library.cuDeviceGetCount.restype = ctypes.c_int
+    library.cuDeviceGetAttribute.argtypes = [
+        ctypes.POINTER(ctypes.c_int),
+        ctypes.c_int,
+        ctypes.c_int,
+    ]
+    library.cuDeviceGetAttribute.restype = ctypes.c_int
+    library.cuDeviceGetName.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
+    library.cuDeviceGetName.restype = ctypes.c_int
+
     status = library.cuInit(0)
     if status != CUresult.CUDA_SUCCESS:
         raise NVIDIAVirtualPackageError(f"Failed to initialize CUDA driver: {status}")
 
+    return library
 
-def driver_get_version() -> tuple[int, int]:
+
+def driver_get_version(library: DLL) -> tuple[int, int]:
     """Return the driver version as a tuple of (major, minor)"""
     driver_version = ctypes.c_int(0)
     status = library.cuDriverGetVersion(ctypes.byref(driver_version))
@@ -95,7 +108,7 @@ def driver_get_version() -> tuple[int, int]:
     return major, minor
 
 
-def device_get_count() -> int:
+def device_get_count(library: DLL) -> int:
     """Return the number of CUDA devices"""
     device_count = ctypes.c_int(0)
     status = library.cuDeviceGetCount(ctypes.byref(device_count))
@@ -104,7 +117,7 @@ def device_get_count() -> int:
     return device_count.value
 
 
-def device_get_attributes(device: int) -> tuple[int, int, str]:
+def device_get_attributes(library: DLL, device: int) -> tuple[int, int, str]:
     """Return a tuple of (cc_major, cc_minor, device_model)"""
     cc_major = ctypes.c_int(0)
     cc_minor = ctypes.c_int(0)
@@ -168,14 +181,14 @@ def get_minimum_sm() -> tuple[str | None, str | None]:
             name = override[1]
         return sm, name
 
-    init_driver()
+    library = init_driver()
 
     minimum_sm_major: int = 999
     minimum_sm_minor: int = 999
     device_name: str = default_name
-    for device in range(device_get_count()):
+    for device in range(device_get_count(library)):
         compute_capability_major, compute_capability_minor, name = (
-            device_get_attributes(device)
+            device_get_attributes(library, device)
         )
         if (
             compute_capability_major < minimum_sm_major
@@ -192,7 +205,6 @@ def get_minimum_sm() -> tuple[str | None, str | None]:
     return f"{minimum_sm_major}.{minimum_sm_minor}", stripped_name
 
 
-@functools.cache
 def cached_minimum_sm() -> tuple[str | None, str | None]:
     """Return a cached version of the minimum_sm."""
     try:
