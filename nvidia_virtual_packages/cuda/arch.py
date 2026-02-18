@@ -32,6 +32,7 @@ that version with the build string set to "0".
 import ctypes
 import ctypes.util
 import enum
+import functools
 import os
 import re
 import typing
@@ -146,6 +147,7 @@ def device_get_attributes(library: DLL, device: int) -> tuple[int, int, str]:
     return (cc_major.value, cc_minor.value, name.value.decode("utf-8"))
 
 
+@functools.cache
 def get_minimum_sm() -> tuple[str | None, str | None]:
     """Try to detect the minimum SM of CUDA devices on the system."""
 
@@ -205,17 +207,12 @@ def get_minimum_sm() -> tuple[str | None, str | None]:
     return f"{minimum_sm_major}.{minimum_sm_minor}", stripped_name
 
 
-def cached_minimum_sm() -> tuple[str | None, str | None]:
-    """Return a cached version of the minimum_sm."""
-    try:
-        return get_minimum_sm()
-    except NVIDIAVirtualPackageError:
-        return None, None
-
-
 @plugins.hookimpl
 def conda_virtual_packages():
-    minimum_sm, device_model_name = cached_minimum_sm()
+    try:
+        minimum_sm, device_model_name = get_minimum_sm()
+    except NVIDIAVirtualPackageError:
+        minimum_sm, device_model_name = None, None
     if minimum_sm is not None and device_model_name is not None:
         # According to CEP-26, we should only create the virtual package if we can
         # detect the driver and devices
