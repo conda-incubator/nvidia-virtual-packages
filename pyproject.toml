@@ -12,9 +12,14 @@ maintainers = [
   { name = "Daniel Ching", email = "dching@nvidia.com" },
 ]
 keywords = ["conda", "virtual package", "archspec", "CUDA", "NVIDIA"]
-dynamic = ["version", "classifiers"]
-dependencies = [
-  "conda",
+dynamic = ["version"]
+dependencies = []
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Operating System :: OS Independent",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Private :: Do Not Upload" # Conda-specific package should not be uploaded to PYPI
 ]
 
 [project.entry-points.conda]
@@ -28,13 +33,7 @@ homepage = "https://github.com/conda-incubator/nvidia-virtual-packages"
 requires = ["setuptools>=80", "setuptools-scm[simple]>=9.2"]
 build-backend = "setuptools.build_meta"
 
-classifiers = [
-  "Development Status :: 4 - Beta",
-  "Intended Audience :: Developers",
-  "Operating System :: OS Independent",
-  "Topic :: Software Development :: Libraries :: Python Modules",
-  "Private :: Do Not Upload" # Conda-specific package should not be uploaded to PYPI
-]
+
 
 [tool.setuptools_scm]
 
