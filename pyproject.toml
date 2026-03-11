@@ -4,7 +4,7 @@ name = "nvidia-virtual-packages"
 description = "Provides conda virtual packages for NVIDIA hardware."
 license = "BSD-3-Clause"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 authors = [
   { name = "Daniel Ching", email = "dching@nvidia.com" },
 ]
@@ -52,7 +52,7 @@ version = "0.0.0"
 
 
 [tool.poetry.dependencies]
-python = "^3.9"
+python = "^3.10"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -159,7 +159,7 @@ section-order = [
 [tool.mypy]
 # https://github.com/python/mypy
 # https://mypy.readthedocs.io/en/latest/config_file.html#using-a-pyproject-toml-file
-python_version = 3.9
+python_version = 3.10
 files = [
   "nvidia_virtual_packages",
   "tests"
