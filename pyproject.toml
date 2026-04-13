@@ -59,7 +59,7 @@ python = "^3.10"
 invoke = "^2.2.0"
 mypy = "^1.14.1"
 mypy-extensions = "^1.0.0"
-pre-commit = "^4.1.0"
+pre-commit = "^4.5.1"
 bandit = "^1.8.2"
 safety = "^3.2.14"
 
