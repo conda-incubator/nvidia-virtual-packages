@@ -57,7 +57,7 @@ python = "^3.10"
 
 [tool.poetry.group.dev.dependencies]
 invoke = "^2.2.0"
-mypy = "^1.14.1"
+mypy = "^1.20.2"
 mypy-extensions = "^1.0.0"
 pre-commit = "^4.1.0"
 bandit = "^1.8.2"
