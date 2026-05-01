@@ -6,27 +6,30 @@ This implementation uses ctypes to call the CUDA driver API.
 
 # Specification
 
-The virtual package MUST be named `__cuda_arch`.
+Implementing the `__cuda_arch` virtual package is RECOMMENDED. If a conda-compatible client
+chooses to implement the `__cuda_arch` virtual package, it MUST follow these specifications:
 
-The virtual package MUST be present when a CUDA device is detected. For systems without CUDA
-devices (maybe driver is installed but no devices are present) the virtual package MUST NOT
-be present.
+The `__cuda_arch` virtual package MUST be absent when the `__cuda` virtual package is
+absent.
 
-When available, the version value MUST be set to the lowest compute capability of all CUDA
-devices detected on the system, formatted as {major}.{minor}; subarchitecture letters (a,f)
-excluded.
+When present, the version value MUST be set to the lowest compute capability of all CUDA
+devices detected on the system, formatted as `{major}.{minor}`; subarchitecture letters
+(e.g. `a`, `f`) are excluded. The build string MUST be `0`.
 
-When available, the build string MUST be the device model of the lowest compute capability
-device as reported by cuDeviceGetName with chars except for [a-zA-Z0-9] removed, "NVIDIA"
-replaced with an empty string, then limited to 64 characters.
+The `__cuda_arch` virtual package MUST be present when a CUDA device is detected EXCEPT when
+`CONDA_OVERRIDE_CUDA_ARCH` is set as described below.
 
-If the CONDA_OVERRIDE_CUDA_ARCH environment variable is set to a non-empty value that can be
-parsed as a compute capability string, the __cuda_arch virtual package MUST be exposed with
-that version with the build string set to "0".
+For systems without CUDA devices (e.g. a driver is installed but no devices are present),
+the virtual package MUST be absent EXCEPT when `CONDA_OVERRIDE_CUDA_ARCH` is set as
+described below.
 
-If the CONDA_OVERRIDE_CUDA_ARCH environment variable is set to a non-empty value that can be
-parsed as a compute capability string and build string separated by `=`, the __cuda_arch
-virtual package MUST be exposed with that version with and build string.
+If the `CONDA_OVERRIDE_CUDA_ARCH` environment variable is set to a non-empty value that can
+be parsed as a compute capability string, the `__cuda_arch` virtual package MUST be exposed
+with that version with the build string set to `0` EXCEPT when the `__cuda` virtual package
+is absent as described above.
+
+If the `CONDA_OVERRIDE_CUDA_ARCH` environment variable is set to the empty string, the
+`__cuda_arch` virtual package MUST be absent.
 """
 
 import ctypes
