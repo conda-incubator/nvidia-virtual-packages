@@ -88,8 +88,6 @@ def init_driver() -> DLL:
         ctypes.c_int,
     ]
     library.cuDeviceGetAttribute.restype = ctypes.c_int
-    library.cuDeviceGetName.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
-    library.cuDeviceGetName.restype = ctypes.c_int
 
     status = library.cuInit(0)
     if status != CUresult.CUDA_SUCCESS:
@@ -118,7 +116,7 @@ def device_get_count(library: DLL) -> int:
     return device_count.value
 
 
-def device_get_attributes(library: DLL, device: int) -> tuple[int, int, str]:
+def device_get_attributes(library: DLL, device: int) -> tuple[int, int]:
     """Return a tuple of (cc_major, cc_minor, device_model)"""
     cc_major = ctypes.c_int(0)
     cc_minor = ctypes.c_int(0)
@@ -140,57 +138,39 @@ def device_get_attributes(library: DLL, device: int) -> tuple[int, int, str]:
         raise NVIDIAVirtualPackageError(
             f"Failed to get CUDA device compute capability: {status}"
         )
-    name = ctypes.create_string_buffer(256)
-    status = library.cuDeviceGetName(name, 256, device)
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to get CUDA device name: {status}")
-    return (cc_major.value, cc_minor.value, name.value.decode("utf-8"))
+    return cc_major.value, cc_minor.value
 
 
 @functools.cache
 def get_minimum_sm() -> tuple[str | None, str | None]:
     """Try to detect the minimum SM of CUDA devices on the system."""
 
+    if "CONDA_OVERRIDE_CUDA" in os.environ and os.environ["CONDA_OVERRIDE_CUDA"].strip() == "":
+        return None, None
+
     default_name = "0"
-    example_override = "Overrides must be of the form: CONDA_OVERRIDE_CUDA_ARCH=0.1 or CONDA_OVERRIDE_CUDA_ARCH=0.1=RTX2345DeviceModelName"
+    example_override = "Overrides must be of the form: CONDA_OVERRIDE_CUDA_ARCH=0.1"
 
     if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
-        override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip().split("=")
-        if not re.fullmatch(r"^[0-9]+\.[0-9]+$", override[0]):
+        override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip()
+        if override == "":
+            return None, None
+        if not re.fullmatch(r"^[0-9]+\.[0-9]+$", override):
             warnings.warn(
-                f"Invalid compute capability ({override[0]}) provided in CONDA_OVERRIDE_CUDA_ARCH. "
+                f"Invalid compute capability ({override}) provided in CONDA_OVERRIDE_CUDA_ARCH. "
                 f"The __cuda_arch virtual package will not be created. "
                 f"{example_override}"
             )
             return None, None
-        else:
-            sm = override[0]
-        if len(override) < 2:
-            warnings.warn(
-                f"A device model was not provided in CONDA_OVERRIDE_CUDA_ARCH. "
-                f"The default model of '{sm}={default_name}' will be used instead. "
-                f"{example_override}"
-            )
-            name = default_name
-        elif not re.fullmatch(r"[a-zA-Z0-9_.+]*", override[1]):
-            warnings.warn(
-                f"Invalid device model ({override[1]}) provided in CONDA_OVERRIDE_CUDA_ARCH. "
-                f"The default model of '{sm}={default_name}' will be used instead. "
-                f"{example_override}"
-            )
-            name = default_name
-        else:
-            name = override[1]
-        return sm, name
+        return override, default_name
 
     library = init_driver()
 
     minimum_sm_major: int = 999
     minimum_sm_minor: int = 999
-    device_name: str = default_name
     for device in range(device_get_count(library)):
-        compute_capability_major, compute_capability_minor, name = (
-            device_get_attributes(library, device)
+        compute_capability_major, compute_capability_minor = device_get_attributes(
+            library, device
         )
         if (
             compute_capability_major < minimum_sm_major
@@ -198,13 +178,8 @@ def get_minimum_sm() -> tuple[str | None, str | None]:
         ):
             minimum_sm_major = compute_capability_major
             minimum_sm_minor = compute_capability_minor
-            device_name = name
-    # Strip out all characters disallowed by CEP-26 and replace "NVIDIA" with an empty
-    # string to save space. Limit the length to 64 characters because of CEP-26.
-    stripped_name = re.sub(
-        "NVIDIA", "", re.sub(r"[^a-zA-Z0-9]", "", device_name), flags=re.IGNORECASE
-    )[:64]
-    return f"{minimum_sm_major}.{minimum_sm_minor}", stripped_name
+
+    return f"{minimum_sm_major}.{minimum_sm_minor}", default_name
 
 
 @plugins.hookimpl
