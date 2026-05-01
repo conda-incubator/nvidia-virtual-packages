@@ -145,7 +145,10 @@ def device_get_attributes(library: DLL, device: int) -> tuple[int, int]:
 def get_minimum_sm() -> tuple[str | None, str | None]:
     """Try to detect the minimum SM of CUDA devices on the system."""
 
-    if "CONDA_OVERRIDE_CUDA" in os.environ and os.environ["CONDA_OVERRIDE_CUDA"].strip() == "":
+    if (
+        "CONDA_OVERRIDE_CUDA" in os.environ
+        and os.environ["CONDA_OVERRIDE_CUDA"].strip() == ""
+    ):
         return None, None
 
     default_name = "0"
@@ -172,9 +175,9 @@ def get_minimum_sm() -> tuple[str | None, str | None]:
         compute_capability_major, compute_capability_minor = device_get_attributes(
             library, device
         )
-        if (
-            compute_capability_major < minimum_sm_major
-            and compute_capability_minor < minimum_sm_minor
+        if (compute_capability_major, compute_capability_minor) < (
+            minimum_sm_major,
+            minimum_sm_minor,
         ):
             minimum_sm_major = compute_capability_major
             minimum_sm_minor = compute_capability_minor
