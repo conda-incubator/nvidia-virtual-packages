@@ -120,7 +120,7 @@ def device_get_count(library: DLL) -> int:
 
 
 def device_get_attributes(library: DLL, device: int) -> tuple[int, int]:
-    """Return a tuple of (cc_major, cc_minor, device_model)"""
+    """Return a tuple of (cc_major, cc_minor)"""
     cc_major = ctypes.c_int(0)
     cc_minor = ctypes.c_int(0)
     status = library.cuDeviceGetAttribute(
@@ -172,9 +172,13 @@ def get_minimum_sm() -> tuple[str | None, str | None]:
 
     library = init_driver()
 
+    device_count = device_get_count(library)
+    if device_count == 0:
+        return None, None
+
     minimum_sm_major: int = 999
     minimum_sm_minor: int = 999
-    for device in range(device_get_count(library)):
+    for device in range(device_count):
         compute_capability_major, compute_capability_minor = device_get_attributes(
             library, device
         )
