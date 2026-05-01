@@ -155,19 +155,30 @@ def get_minimum_sm() -> tuple[str | None, str | None]:
         return None, None
 
     default_name = "0"
-    example_override = "Overrides must be of the form: CONDA_OVERRIDE_CUDA_ARCH=0.1"
 
     if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
         override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip()
         if override == "":
             return None, None
-        if not re.fullmatch(r"^[0-9]+\.[0-9]+$", override):
+        if not re.fullmatch(r"[0-9]+\.[0-9]+", override):
             warnings.warn(
                 f"Invalid compute capability ({override}) provided in CONDA_OVERRIDE_CUDA_ARCH. "
                 f"The __cuda_arch virtual package will not be created. "
-                f"{example_override}"
+                f"Overrides must be of the form: CONDA_OVERRIDE_CUDA_ARCH=0.1"
             )
             return None, None
+        # __cuda must be present for __cuda_arch to be exposed. If the user has asserted
+        # CUDA via CONDA_OVERRIDE_CUDA, trust them; otherwise require a real driver.
+        if "CONDA_OVERRIDE_CUDA" not in os.environ:
+            try:
+                init_driver()
+            except NVIDIAVirtualPackageError:
+                warnings.warn(
+                    f"CONDA_OVERRIDE_CUDA_ARCH is set ({override}), but neither the CUDA driver "
+                    f"or CONDA_OVERRIDE_CUDA were detected. "
+                    f"The __cuda_arch virtual package will not be created."
+                )
+                return None, None
         return override, default_name
 
     library = init_driver()
