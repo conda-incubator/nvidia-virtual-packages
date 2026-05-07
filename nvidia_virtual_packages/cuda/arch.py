@@ -6,27 +6,30 @@ This implementation uses ctypes to call the CUDA driver API.
 
 # Specification
 
-The virtual package MUST be named `__cuda_arch`.
+Implementing the `__cuda_arch` virtual package is RECOMMENDED. If a conda-compatible client
+chooses to implement the `__cuda_arch` virtual package, it MUST follow these specifications:
 
-The virtual package MUST be present when a CUDA device is detected. For systems without CUDA
-devices (maybe driver is installed but no devices are present) the virtual package MUST NOT
-be present.
+The `__cuda_arch` virtual package MUST be absent when the `__cuda` virtual package is
+absent.
 
-When available, the version value MUST be set to the lowest compute capability of all CUDA
-devices detected on the system, formatted as {major}.{minor}; subarchitecture letters (a,f)
-excluded.
+When present, the version value MUST be set to the lowest compute capability of all CUDA
+devices detected on the system, formatted as `{major}.{minor}`; subarchitecture letters
+(e.g. `a`, `f`) are excluded. The build string MUST be `0`.
 
-When available, the build string MUST be the device model of the lowest compute capability
-device as reported by cuDeviceGetName with chars except for [a-zA-Z0-9] removed, "NVIDIA"
-replaced with an empty string, then limited to 64 characters.
+The `__cuda_arch` virtual package MUST be present when a CUDA device is detected EXCEPT when
+`CONDA_OVERRIDE_CUDA_ARCH` is set as described below.
 
-If the CONDA_OVERRIDE_CUDA_ARCH environment variable is set to a non-empty value that can be
-parsed as a compute capability string, the __cuda_arch virtual package MUST be exposed with
-that version with the build string set to "0".
+For systems without CUDA devices (e.g. a driver is installed but no devices are present),
+the virtual package MUST be absent EXCEPT when `CONDA_OVERRIDE_CUDA_ARCH` is set as
+described below.
 
-If the CONDA_OVERRIDE_CUDA_ARCH environment variable is set to a non-empty value that can be
-parsed as a compute capability string and build string separated by `=`, the __cuda_arch
-virtual package MUST be exposed with that version with and build string.
+If the `CONDA_OVERRIDE_CUDA_ARCH` environment variable is set to a non-empty value that can
+be parsed as a compute capability string, the `__cuda_arch` virtual package MUST be exposed
+with that version with the build string set to `0` EXCEPT when the `__cuda` virtual package
+is absent as described above.
+
+If the `CONDA_OVERRIDE_CUDA_ARCH` environment variable is set to the empty string, the
+`__cuda_arch` virtual package MUST be absent.
 """
 
 import ctypes
@@ -88,8 +91,6 @@ def init_driver() -> DLL:
         ctypes.c_int,
     ]
     library.cuDeviceGetAttribute.restype = ctypes.c_int
-    library.cuDeviceGetName.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_int]
-    library.cuDeviceGetName.restype = ctypes.c_int
 
     status = library.cuInit(0)
     if status != CUresult.CUDA_SUCCESS:
@@ -118,8 +119,8 @@ def device_get_count(library: DLL) -> int:
     return device_count.value
 
 
-def device_get_attributes(library: DLL, device: int) -> tuple[int, int, str]:
-    """Return a tuple of (cc_major, cc_minor, device_model)"""
+def device_get_attributes(library: DLL, device: int) -> tuple[int, int]:
+    """Return a tuple of (cc_major, cc_minor)"""
     cc_major = ctypes.c_int(0)
     cc_minor = ctypes.c_int(0)
     status = library.cuDeviceGetAttribute(
@@ -140,71 +141,66 @@ def device_get_attributes(library: DLL, device: int) -> tuple[int, int, str]:
         raise NVIDIAVirtualPackageError(
             f"Failed to get CUDA device compute capability: {status}"
         )
-    name = ctypes.create_string_buffer(256)
-    status = library.cuDeviceGetName(name, 256, device)
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to get CUDA device name: {status}")
-    return (cc_major.value, cc_minor.value, name.value.decode("utf-8"))
+    return cc_major.value, cc_minor.value
 
 
 @functools.cache
 def get_minimum_sm() -> tuple[str | None, str | None]:
     """Try to detect the minimum SM of CUDA devices on the system."""
 
+    if (
+        "CONDA_OVERRIDE_CUDA" in os.environ
+        and os.environ["CONDA_OVERRIDE_CUDA"].strip() == ""
+    ):
+        return None, None
+
     default_name = "0"
-    example_override = "Overrides must be of the form: CONDA_OVERRIDE_CUDA_ARCH=0.1 or CONDA_OVERRIDE_CUDA_ARCH=0.1=RTX2345DeviceModelName"
 
     if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
-        override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip().split("=")
-        if not re.fullmatch(r"^[0-9]+\.[0-9]+$", override[0]):
+        override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip()
+        if override == "":
+            return None, None
+        if not re.fullmatch(r"[0-9]+\.[0-9]+", override):
             warnings.warn(
-                f"Invalid compute capability ({override[0]}) provided in CONDA_OVERRIDE_CUDA_ARCH. "
+                f"Invalid compute capability ({override}) provided in CONDA_OVERRIDE_CUDA_ARCH. "
                 f"The __cuda_arch virtual package will not be created. "
-                f"{example_override}"
+                f"Overrides must be of the form: CONDA_OVERRIDE_CUDA_ARCH=0.1"
             )
             return None, None
-        else:
-            sm = override[0]
-        if len(override) < 2:
-            warnings.warn(
-                f"A device model was not provided in CONDA_OVERRIDE_CUDA_ARCH. "
-                f"The default model of '{sm}={default_name}' will be used instead. "
-                f"{example_override}"
-            )
-            name = default_name
-        elif not re.fullmatch(r"[a-zA-Z0-9_.+]*", override[1]):
-            warnings.warn(
-                f"Invalid device model ({override[1]}) provided in CONDA_OVERRIDE_CUDA_ARCH. "
-                f"The default model of '{sm}={default_name}' will be used instead. "
-                f"{example_override}"
-            )
-            name = default_name
-        else:
-            name = override[1]
-        return sm, name
+        # __cuda must be present for __cuda_arch to be exposed. If the user has asserted
+        # CUDA via CONDA_OVERRIDE_CUDA, trust them; otherwise require a real driver.
+        if "CONDA_OVERRIDE_CUDA" not in os.environ:
+            try:
+                init_driver()
+            except NVIDIAVirtualPackageError:
+                warnings.warn(
+                    f"CONDA_OVERRIDE_CUDA_ARCH is set ({override}), but neither the CUDA driver "
+                    f"or CONDA_OVERRIDE_CUDA were detected. "
+                    f"The __cuda_arch virtual package will not be created."
+                )
+                return None, None
+        return override, default_name
 
     library = init_driver()
 
+    device_count = device_get_count(library)
+    if device_count == 0:
+        return None, None
+
     minimum_sm_major: int = 999
     minimum_sm_minor: int = 999
-    device_name: str = default_name
-    for device in range(device_get_count(library)):
-        compute_capability_major, compute_capability_minor, name = (
-            device_get_attributes(library, device)
+    for device in range(device_count):
+        compute_capability_major, compute_capability_minor = device_get_attributes(
+            library, device
         )
-        if (
-            compute_capability_major < minimum_sm_major
-            and compute_capability_minor < minimum_sm_minor
+        if (compute_capability_major, compute_capability_minor) < (
+            minimum_sm_major,
+            minimum_sm_minor,
         ):
             minimum_sm_major = compute_capability_major
             minimum_sm_minor = compute_capability_minor
-            device_name = name
-    # Strip out all characters disallowed by CEP-26 and replace "NVIDIA" with an empty
-    # string to save space. Limit the length to 64 characters because of CEP-26.
-    stripped_name = re.sub(
-        "NVIDIA", "", re.sub(r"[^a-zA-Z0-9]", "", device_name), flags=re.IGNORECASE
-    )[:64]
-    return f"{minimum_sm_major}.{minimum_sm_minor}", stripped_name
+
+    return f"{minimum_sm_major}.{minimum_sm_minor}", default_name
 
 
 @plugins.hookimpl
