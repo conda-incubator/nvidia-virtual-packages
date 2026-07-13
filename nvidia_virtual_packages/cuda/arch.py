@@ -43,11 +43,15 @@ import warnings
 
 from conda import plugins
 
-# WinDLL only exists on Windows; use a type alias based on platform so annotations work everywhere.
-if os.name == "nt":
-    DLL: typing.TypeAlias = ctypes.WinDLL  # type: ignore
+# WinDLL only exists on Windows. For type-checking, treat the handle as its
+# common base class CDLL (WinDLL subclasses it) so annotations resolve on every
+# platform; select the concrete loader at runtime.
+if typing.TYPE_CHECKING:
+    DLL: typing.TypeAlias = ctypes.CDLL
+elif os.name == "nt":
+    DLL = ctypes.WinDLL
 else:
-    DLL: typing.TypeAlias = ctypes.CDLL  # type: ignore
+    DLL = ctypes.CDLL
 
 
 class CUresult(enum.IntEnum):
@@ -66,16 +70,17 @@ class NVIDIAVirtualPackageError(RuntimeError):
 def init_driver() -> DLL:
     """Initialize the CUDA driver API"""
 
+    library: DLL
     if os.name == "nt":
         library_path = ctypes.util.find_library("nvcuda")
         if library_path is None:
             raise NVIDIAVirtualPackageError("Failed to find nvcuda library")
-        library = ctypes.WinDLL(library_path)  # type: ignore[unused-ignore,attr-defined]
+        library = ctypes.WinDLL(library_path)  # type: ignore[attr-defined,unused-ignore]
     elif os.name == "posix":
         library_path = ctypes.util.find_library("cuda")
         if library_path is None:
             raise NVIDIAVirtualPackageError("Failed to find cuda library")
-        library = ctypes.CDLL(library_path)  # type: ignore[unused-ignore,attr-defined]
+        library = ctypes.CDLL(library_path)
     else:
         raise NVIDIAVirtualPackageError(f"Unsupported OS: {os.name}")
 
