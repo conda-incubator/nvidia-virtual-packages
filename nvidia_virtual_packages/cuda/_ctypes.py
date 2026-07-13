@@ -1,4 +1,5 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-FileCopyrightText: Copyright (c) 2012 Anaconda, Inc
 # SPDX-License-Identifier: BSD-3-Clause
 """Low-level ctypes bindings for the CUDA driver API.
 
@@ -6,11 +7,12 @@ This module is the single place that loads the CUDA driver library and wraps the
 driver entry points needed by the virtual-package plugins.
 """
 
+import contextlib
 import ctypes
-import ctypes.util
 import enum
 import functools
 import os
+import platform
 import typing
 
 # WinDLL only exists on Windows. For type-checking, treat the handle as its
@@ -37,6 +39,45 @@ class NVIDIAVirtualPackageError(RuntimeError):
     """A unique RuntimeError for NVIDIA virtual package errors, so we can catch errors specific to this plugin."""
 
 
+def _candidate_library_names(system: str) -> list[str]:
+    """Return the ordered CUDA driver library candidates for a platform.
+
+    Parameters
+    ----------
+    system : str
+        The platform name as returned by :func:`platform.system`.
+
+    Returns
+    -------
+    list of str
+        Candidate library filenames/paths to try in order. Mirrors conda's
+        built-in ``__cuda`` provider so detection covers the same driver-only,
+        vendor-dir, and WSL locations. There is intentionally no
+        ``find_library`` fallback: the list is exhaustive and deterministic.
+    """
+    if system == "Windows":
+        bits = platform.architecture()[0].replace("bit", "")
+        return [f"nvcuda{bits}.dll", "nvcuda.dll"]
+    if system == "Darwin":
+        return [
+            "libcuda.1.dylib",
+            "libcuda.dylib",
+            "/usr/local/cuda/lib/libcuda.1.dylib",
+            "/usr/local/cuda/lib/libcuda.dylib",
+        ]
+    if system == "Linux":
+        bases = [
+            "libcuda.so",  # check library path first
+            "/usr/lib64/nvidia/libcuda.so",  # RHEL/CentOS/Fedora
+            "/usr/lib/x86_64-linux-gnu/libcuda.so",  # Debian/Ubuntu multiarch
+            "/usr/lib/wsl/lib/libcuda.so",  # WSL
+        ]
+        # Try the versioned SONAME (``.1``) before the bare name; a driver-only
+        # install often lacks the unversioned symlink from the ``-dev`` package.
+        return [name for base in bases for name in (f"{base}.1", base)]
+    return []
+
+
 @functools.cache
 def init_driver() -> DLL:
     """Initialize the CUDA driver API.
@@ -48,18 +89,17 @@ def init_driver() -> DLL:
     """
 
     library: DLL
-    if os.name == "nt":
-        library_path = ctypes.util.find_library("nvcuda")
-        if library_path is None:
-            raise NVIDIAVirtualPackageError("Failed to find nvcuda library")
-        library = ctypes.WinDLL(library_path)  # type: ignore[attr-defined,unused-ignore]
-    elif os.name == "posix":
-        library_path = ctypes.util.find_library("cuda")
-        if library_path is None:
-            raise NVIDIAVirtualPackageError("Failed to find cuda library")
-        library = ctypes.CDLL(library_path)
+    system = platform.system()
+    candidates = _candidate_library_names(system)
+    if not candidates:
+        raise NVIDIAVirtualPackageError(f"Unsupported OS: {system}")
+    loader = ctypes.WinDLL if system == "Windows" else ctypes.CDLL  # type: ignore[attr-defined,unused-ignore]
+    for candidate in candidates:
+        with contextlib.suppress(OSError):
+            library = loader(candidate)
+            break
     else:
-        raise NVIDIAVirtualPackageError(f"Unsupported OS: {os.name}")
+        raise NVIDIAVirtualPackageError("Failed to load the CUDA driver library")
 
     library.cuDriverGetVersion.argtypes = [ctypes.POINTER(ctypes.c_int)]
     library.cuDriverGetVersion.restype = ctypes.c_int
