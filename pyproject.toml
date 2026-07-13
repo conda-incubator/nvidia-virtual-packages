@@ -5,12 +5,8 @@ description = "Provides conda virtual packages for NVIDIA hardware."
 license = "BSD-3-Clause"
 readme = "README.md"
 requires-python = ">=3.10"
-authors = [
-  { name = "Daniel Ching", email = "dching@nvidia.com" },
-]
-maintainers = [
-  { name = "Daniel Ching", email = "dching@nvidia.com" },
-]
+authors = [{ name = "Daniel Ching", email = "dching@nvidia.com" }]
+maintainers = [{ name = "Daniel Ching", email = "dching@nvidia.com" }]
 keywords = ["conda", "virtual package", "archspec", "CUDA", "NVIDIA"]
 dynamic = ["version"]
 dependencies = []
@@ -19,7 +15,7 @@ classifiers = [
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
   "Topic :: Software Development :: Libraries :: Python Modules",
-  "Private :: Do Not Upload" # Conda-specific package should not be uploaded to PYPI
+  "Private :: Do Not Upload",                                     # Conda-specific package should not be uploaded to PYPI
 ]
 
 [project.entry-points.conda]
@@ -32,7 +28,6 @@ homepage = "https://github.com/conda-incubator/nvidia-virtual-packages"
 [build-system]
 requires = ["setuptools>=80", "setuptools-scm[simple]>=9.2"]
 build-backend = "setuptools.build_meta"
-
 
 
 [tool.setuptools_scm]
@@ -59,8 +54,8 @@ task-tags = [
   "NEEDSWORK",
   "UPDATEME",
   "TODO",
-  "REFACTOR"
-]  # UPDATEME by modifying or removing this setting after addressing all UPDATEMEs
+  "REFACTOR",
+] # UPDATEME by modifying or removing this setting after addressing all UPDATEMEs
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**.py" = ["D100", "D101", "D102", "D103", "D104", "S101"]
@@ -93,7 +88,13 @@ max-bool-expr = 3
 [tool.ruff.lint.isort]
 split-on-trailing-comma = false
 known-first-party = ["nvidia_virtual_packages"]
-sections.typing = ["typing", "types", "typing_extensions", "mypy", "mypy_extensions"]
+sections.typing = [
+  "typing",
+  "types",
+  "typing_extensions",
+  "mypy",
+  "mypy_extensions",
+]
 sections.testing = ["pytest", "tests"]
 section-order = [
   "future",
@@ -102,18 +103,15 @@ section-order = [
   "third-party",
   "first-party",
   "local-folder",
-  "testing"
+  "testing",
 ]
 
 
 [tool.mypy]
 # https://github.com/python/mypy
 # https://mypy.readthedocs.io/en/latest/config_file.html#using-a-pyproject-toml-file
-python_version = 3.10
-files = [
-  "nvidia_virtual_packages",
-  "tests"
-]
+python_version = "3.10"
+files = ["nvidia_virtual_packages", "tests"]
 pretty = true
 show_traceback = true
 color_output = true
@@ -140,7 +138,7 @@ warn_unused_ignores = true
 # https://github.com/pytest-dev/pytest
 # https://docs.pytest.org/en/6.2.x/customize.html#pyproject-toml
 # Directories that are not visited by pytest collector:
-norecursedirs =[
+norecursedirs = [
   "hooks",
   "*.egg",
   ".eggs",
@@ -149,9 +147,13 @@ norecursedirs =[
   "docs",
   ".tox",
   ".git",
-  "__pycache__"
+  "__pycache__",
 ]
-doctest_optionflags = ["NUMBER", "NORMALIZE_WHITESPACE", "IGNORE_EXCEPTION_DETAIL"]
+doctest_optionflags = [
+  "NUMBER",
+  "NORMALIZE_WHITESPACE",
+  "IGNORE_EXCEPTION_DETAIL",
+]
 timeout = 10
 bdd_features_base_dir = "features/"
 
@@ -164,7 +166,7 @@ addopts = [
   "--pikachu",
   "--cov=nvidia_virtual_packages",
   "--cov-config=pyproject.toml",
-  "--junitxml=test_report.xml"
+  "--junitxml=test_report.xml",
 ]
 
 
@@ -174,10 +176,7 @@ branch = true
 
 
 [tool.coverage.report]
-exclude_also = [
-  "def main",
-  "if __name__ == .__main__.:"
-]
+exclude_also = ["def main", "if __name__ == .__main__.:"]
 fail_under = 50
 show_missing = true
 
