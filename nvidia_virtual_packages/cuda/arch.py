@@ -48,28 +48,26 @@ from nvidia_virtual_packages.cuda._ctypes import (
 
 
 @functools.cache
-def get_minimum_sm() -> tuple[str | None, str | None]:
+def get_minimum_sm() -> str | None:
     """Try to detect the minimum SM of CUDA devices on the system."""
 
     if (
         "CONDA_OVERRIDE_CUDA" in os.environ
         and os.environ["CONDA_OVERRIDE_CUDA"].strip() == ""
     ):
-        return None, None
-
-    default_name = "0"
+        return None
 
     if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
         override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip()
         if override == "":
-            return None, None
+            return None
         if not re.fullmatch(r"[0-9]+\.[0-9]+", override):
             warnings.warn(
                 f"Invalid compute capability ({override}) provided in CONDA_OVERRIDE_CUDA_ARCH. "
                 f"The __cuda_arch virtual package will not be created. "
                 f"Overrides must be of the form: CONDA_OVERRIDE_CUDA_ARCH=0.1"
             )
-            return None, None
+            return None
         # __cuda must be present for __cuda_arch to be exposed. If the user has asserted
         # CUDA via CONDA_OVERRIDE_CUDA, trust them; otherwise require a real driver.
         if "CONDA_OVERRIDE_CUDA" not in os.environ:
@@ -81,14 +79,14 @@ def get_minimum_sm() -> tuple[str | None, str | None]:
                     f"or CONDA_OVERRIDE_CUDA were detected. "
                     f"The __cuda_arch virtual package will not be created."
                 )
-                return None, None
-        return override, default_name
+                return None
+        return override
 
     library = init_driver()
 
     device_count = device_get_count(library)
     if device_count == 0:
-        return None, None
+        return None
 
     minimum_sm_major: int = 999
     minimum_sm_minor: int = 999
@@ -103,18 +101,18 @@ def get_minimum_sm() -> tuple[str | None, str | None]:
             minimum_sm_major = compute_capability_major
             minimum_sm_minor = compute_capability_minor
 
-    return f"{minimum_sm_major}.{minimum_sm_minor}", default_name
+    return f"{minimum_sm_major}.{minimum_sm_minor}"
 
 
 @plugins.hookimpl
 def conda_virtual_packages():
     try:
-        minimum_sm, device_model_name = get_minimum_sm()
+        minimum_sm = get_minimum_sm()
     except NVIDIAVirtualPackageError:
-        minimum_sm, device_model_name = None, None
-    if minimum_sm is not None and device_model_name is not None:
+        minimum_sm = None
+    if minimum_sm is not None:
         # According to CEP-26, we should only create the virtual package if we can
         # detect the driver and devices
         yield plugins.CondaVirtualPackage(
-            name="cuda_arch", version=minimum_sm, build=device_model_name
+            name="cuda_arch", version=minimum_sm, build="0"
         )
