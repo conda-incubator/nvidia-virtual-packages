@@ -19,6 +19,7 @@ classifiers = [
 ]
 
 [project.entry-points.conda]
+cuda = "nvidia_virtual_packages.cuda.version"
 cuda-arch = "nvidia_virtual_packages.cuda.arch"
 
 [project.urls]

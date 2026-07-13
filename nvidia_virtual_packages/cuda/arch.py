@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
-"""Define a virtual package exposing the arch of CUDA devices on the system.
+"""Define a virtual package exposing the minimum arch of CUDA devices on the system.
 
 This implementation uses ctypes to call the CUDA driver API.
 
@@ -32,121 +32,19 @@ If the `CONDA_OVERRIDE_CUDA_ARCH` environment variable is set to the empty strin
 `__cuda_arch` virtual package MUST be absent.
 """
 
-import ctypes
-import ctypes.util
-import enum
 import functools
 import os
 import re
-import typing
 import warnings
 
 from conda import plugins
 
-# WinDLL only exists on Windows. For type-checking, treat the handle as its
-# common base class CDLL (WinDLL subclasses it) so annotations resolve on every
-# platform; select the concrete loader at runtime.
-if typing.TYPE_CHECKING:
-    DLL: typing.TypeAlias = ctypes.CDLL
-elif os.name == "nt":
-    DLL = ctypes.WinDLL
-else:
-    DLL = ctypes.CDLL
-
-
-class CUresult(enum.IntEnum):
-    CUDA_SUCCESS = 0
-
-
-class CUdevice_attribute(enum.IntEnum):
-    CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR = 75
-    CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR = 76
-
-
-class NVIDIAVirtualPackageError(RuntimeError):
-    """A unique RuntimeError for NVIDIA virtual package errors, so we can catch errors specific to this plugin."""
-
-
-def init_driver() -> DLL:
-    """Initialize the CUDA driver API"""
-
-    library: DLL
-    if os.name == "nt":
-        library_path = ctypes.util.find_library("nvcuda")
-        if library_path is None:
-            raise NVIDIAVirtualPackageError("Failed to find nvcuda library")
-        library = ctypes.WinDLL(library_path)  # type: ignore[attr-defined,unused-ignore]
-    elif os.name == "posix":
-        library_path = ctypes.util.find_library("cuda")
-        if library_path is None:
-            raise NVIDIAVirtualPackageError("Failed to find cuda library")
-        library = ctypes.CDLL(library_path)
-    else:
-        raise NVIDIAVirtualPackageError(f"Unsupported OS: {os.name}")
-
-    library.cuDriverGetVersion.argtypes = [ctypes.POINTER(ctypes.c_int)]
-    library.cuDriverGetVersion.restype = ctypes.c_int
-    library.cuInit.argtypes = [ctypes.c_uint]
-    library.cuInit.restype = ctypes.c_int
-    library.cuDeviceGetCount.argtypes = [ctypes.POINTER(ctypes.c_int)]
-    library.cuDeviceGetCount.restype = ctypes.c_int
-    library.cuDeviceGetAttribute.argtypes = [
-        ctypes.POINTER(ctypes.c_int),
-        ctypes.c_int,
-        ctypes.c_int,
-    ]
-    library.cuDeviceGetAttribute.restype = ctypes.c_int
-
-    status = library.cuInit(0)
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to initialize CUDA driver: {status}")
-
-    return library
-
-
-def driver_get_version(library: DLL) -> tuple[int, int]:
-    """Return the driver version as a tuple of (major, minor)"""
-    driver_version = ctypes.c_int(0)
-    status = library.cuDriverGetVersion(ctypes.byref(driver_version))
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to get CUDA driver version: {status}")
-    major = int(driver_version.value / 1000)
-    minor = (driver_version.value % 1000) // 10
-    return major, minor
-
-
-def device_get_count(library: DLL) -> int:
-    """Return the number of CUDA devices"""
-    device_count = ctypes.c_int(0)
-    status = library.cuDeviceGetCount(ctypes.byref(device_count))
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to get CUDA device count: {status}")
-    return device_count.value
-
-
-def device_get_attributes(library: DLL, device: int) -> tuple[int, int]:
-    """Return a tuple of (cc_major, cc_minor)"""
-    cc_major = ctypes.c_int(0)
-    cc_minor = ctypes.c_int(0)
-    status = library.cuDeviceGetAttribute(
-        ctypes.byref(cc_major),
-        CUdevice_attribute.CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
-        device,
-    )
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(
-            f"Failed to get CUDA device compute capability: {status}"
-        )
-    status = library.cuDeviceGetAttribute(
-        ctypes.byref(cc_minor),
-        CUdevice_attribute.CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
-        device,
-    )
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(
-            f"Failed to get CUDA device compute capability: {status}"
-        )
-    return cc_major.value, cc_minor.value
+from nvidia_virtual_packages.cuda._ctypes import (
+    NVIDIAVirtualPackageError,
+    device_get_attributes,
+    device_get_count,
+    init_driver,
+)
 
 
 @functools.cache
