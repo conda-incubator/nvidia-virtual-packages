@@ -18,6 +18,11 @@ classifiers = [
   "Private :: Do Not Upload",                                     # Conda-specific package should not be uploaded to PYPI
 ]
 
+[project.optional-dependencies]
+# Plugins assumed by [tool.pytest.ini_options].addopts plus pytest-benchmark for
+# tests/test_benchmark.py. Install with: pip install -e ".[test]"
+test = ["pytest", "pytest-benchmark", "pytest-cov", "pytest-timeout", "pytest-pikachu"]
+
 [project.entry-points.conda]
 cuda = "nvidia_virtual_packages.cuda.version"
 cuda-arch = "nvidia_virtual_packages.cuda.arch"
