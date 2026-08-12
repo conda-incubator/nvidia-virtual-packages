@@ -99,9 +99,10 @@ priority:
   - 0
 
 zip_keys:
-  - cuda_arch_min
-  - CUDAARCHS
-  - priority
+  - 
+    - cuda_arch_min
+    - CUDAARCHS
+    - priority
 ```
 
 In the recipe, we need to augment the build number according to install priority, pass the
