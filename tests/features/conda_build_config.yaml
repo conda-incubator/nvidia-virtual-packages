@@ -1,19 +1,34 @@
 CUDAARCHS:
-  - "50-real;60-real;70-real"
-  - "82-real"
+  - "86-real;86-virtual"
   - "80-real;80-virtual"
+  - "50-real;60-real;70-real;70-virtual"
 
-__cuda_arch:
-  - "0 | >=5,<8"
-  - "0 | 8.2.*"
-  - "0 | >=8"
+cuda_arch_version:
+  - 8.6
+  - 8.0
+  - 5.0
 
 priority:
-  - 0
   - 2
   - 1
+  - 0
 
 zip_keys:
-  - __cuda_arch
+  - cuda_arch_version
   - CUDAARCHS
   - priority
+
+cuda_compiler:
+  - cuda-nvcc
+
+c_compiler:
+  - gcc                        # [linux]
+  - vs2022                     # [win]
+
+c_stdlib:
+  - sysroot                    # [linux]
+  - vs                         # [win]
+
+cxx_compiler:
+  - gxx                        # [linux]
+  - vs2022                     # [win]
