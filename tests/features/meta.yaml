@@ -3,7 +3,7 @@
 
 package:
   name: "cuda-archs-test-package"
-  version: "1.0.0"
+  version: "2.0.0"
 
 build:
   number: {{ build + priority | int * 100 }}
@@ -12,14 +12,17 @@ env:
   - CUDAARCHS={{ CUDAARCHS }}
 
 requirements:
-  # build:
-  #   - {{ compiler('c') }}
-  #   - {{ compiler('cxx') }}
-  #   - {{ compiler('cuda') }}
-  #   - {{ stdlib('c') }}
-  run:
-    - __cuda_arch {{ __cuda_arch }}
+  build:
+    - {{ compiler('c') }}
+    - {{ compiler('cxx') }}
+    - {{ compiler('cuda') }}
+    - {{ stdlib('c') }}
+  host:
+    - cuda-arch {{ cuda_arch_version }}
 
 test:
+  requires:
+    # pin cuda-arch at test time, to check for installability
+    - cuda-arch {{ cuda_arch_version }}
   commands:
     - hello.sh

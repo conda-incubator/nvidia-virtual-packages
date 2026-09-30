@@ -60,7 +60,7 @@ environment variable will tell CMake which compute capabilities to target.
 
 In this example, we have three variants. One variant is built for the major versions 5 and 6
 with PTX for 6, so it should be able to run on any device with compute capability `>=5`. One
-variant is built for compute capability 8.2 with PTX. One variant is built for compute
+variant is built for compute capability 8.6 with PTX. One variant is built for compute
 capability 7.0 with PTX.
 
 > [!WARNING]
@@ -79,21 +79,21 @@ device.
 
 # CUDAARCHS is a CMake-specific environment variable
 CUDAARCHS:
-  - "82"
+  - "86"
   - "70-real;70-virtual"
   - "50-real;60"
 
 # Just for illustration, the equivalent args for pytorch would be
 TORCH_CUDA_ARCH_LIST:
-  - "8.2+PTX"
+  - "8.6+PTX"
   - "7.0+PTX"
   - "5.0 6.0+PTX"
 
 # These strings define the corresponding compatible compute capabilities
 cuda_arch_version:
-  - "8.2"
-  - "7.0"
-  - "5.0"
+  - 8.6
+  - 7.0
+  - 5.0
 
 # We should rank the variants in case multiple variants match a user's machine
 # Higher numbers are higher priority
@@ -145,6 +145,11 @@ requirements:
   # ensure that dependencies are also compatible with the minimum supported cuda-arch
     - cuda-arch {{ cuda_arch_version }}
 
+test:
+  requires:
+    # Pin cuda-arch at test time, to check for installability; otherwise, cuda-arch
+    # will float up to the newest allowed cuda-arch.
+    - cuda-arch {{ cuda_arch_version }}
 ```
 
 ## What about arch-specific and family-specific instruction sets such as 90a and 120f?
