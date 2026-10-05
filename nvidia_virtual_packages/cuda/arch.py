@@ -212,6 +212,6 @@ def conda_virtual_packages():
     if minimum_sm is not None and device_model_name is not None:
         # According to CEP-26, we should only create the virtual package if we can
         # detect the driver and devices
-        yield plugins.CondaVirtualPackage(
+        yield plugins.types.CondaVirtualPackage(
             name="cuda_arch", version=minimum_sm, build=device_model_name
         )
