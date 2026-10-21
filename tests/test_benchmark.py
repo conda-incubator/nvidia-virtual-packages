@@ -5,8 +5,8 @@
 conda invokes the virtual-package hooks on every solve, so the wall-clock cost of
 loading the CUDA driver and probing devices adds latency to every conda operation on
 NVIDIA machines. These benchmarks measure the *cold* cost — the ``functools`` caches on
-``init_driver``/``get_cuda_version``/``get_minimum_sm`` are cleared before each timed
-round so every round pays the real driver load + probe rather than a cache hit.
+``detect``/``get_cuda_version``/``get_minimum_sm`` are cleared before each timed
+round so every round spawns the detector process and pays the real driver load + probe.
 
 Two caveats when running these:
 
@@ -19,14 +19,14 @@ Two caveats when running these:
 
 import pytest
 
-from nvidia_virtual_packages.cuda._ctypes import NVIDIAVirtualPackageError, init_driver
+from nvidia_virtual_packages.cuda._ctypes import detect
 from nvidia_virtual_packages.cuda.arch import get_minimum_sm
 from nvidia_virtual_packages.cuda.version import get_cuda_version
 
 
 def _clear_caches() -> None:
     """Drop every cached driver-probe result so the next call is cold."""
-    init_driver.cache_clear()
+    detect.cache_clear()
     get_cuda_version.cache_clear()
     get_minimum_sm.cache_clear()
 
@@ -41,9 +41,8 @@ def _cold_setup() -> tuple[tuple[object, ...], dict[str, object]]:
 def _require_driver():
     """Skip the benchmarks when no CUDA driver is present."""
     try:
-        init_driver()
-    except NVIDIAVirtualPackageError:
-        pytest.skip("no CUDA driver present")
+        if detect() is None:
+            pytest.skip("no CUDA driver present")
     finally:
         # Ensure the first timed round is cold regardless of the probe above.
         _clear_caches()

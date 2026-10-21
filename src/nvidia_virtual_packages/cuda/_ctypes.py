@@ -18,6 +18,7 @@ import typing
 # ctypes is imported lazily inside the functions that use it to keep plugin import time low.
 if typing.TYPE_CHECKING:
     import ctypes
+    import multiprocessing.queues
 
     # WinDLL subclasses CDLL, so CDLL works as the handle type on every platform.
     DLL: typing.TypeAlias = ctypes.CDLL
@@ -168,3 +169,70 @@ def device_get_attributes(library: DLL, device: int) -> tuple[int, int]:
             f"Failed to get CUDA device compute capability: {status}"
         )
     return cc_major.value, cc_minor.value
+
+
+DetectionResult: typing.TypeAlias = "tuple[tuple[int, int], list[tuple[int, int]]]"
+
+
+def _detector_target(
+    queue: multiprocessing.queues.SimpleQueue[DetectionResult | None],
+) -> None:
+    """Probe the driver in a child process and put the result on ``queue``.
+
+    Puts ``((major, minor), [(cc_major, cc_minor), ...])`` or ``None`` when no usable driver
+    is found. The device list is empty if the devices cannot be queried, so that the driver
+    version is still reported. Like conda's built-in ``__cuda`` detector,
+    ``CUDA_VISIBLE_DEVICES`` is removed (in this child only) so every device is seen.
+    """
+    import os
+
+    os.environ.pop("CUDA_VISIBLE_DEVICES", None)
+    try:
+        library = init_driver()
+        version = driver_get_version(library)
+    except Exception:
+        queue.put(None)
+        return
+    try:
+        capabilities = [
+            device_get_attributes(library, device)
+            for device in range(device_get_count(library))
+        ]
+    except Exception:
+        capabilities = []
+    queue.put((version, capabilities))
+
+
+@functools.cache
+def detect() -> DetectionResult | None:
+    """Return the driver version and device compute capabilities, or ``None``.
+
+    The driver is initialised once, in a spawned child process with a timeout, so that a
+    hung or crashing driver cannot take conda down. Both the ``__cuda`` and ``__cuda_arch``
+    providers share this cached result.
+    """
+    import multiprocessing
+    import warnings
+
+    try:
+        context = multiprocessing.get_context("spawn")
+        queue = context.SimpleQueue()
+    except PermissionError as e:
+        warnings.warn(
+            f"Unable to detect CUDA due to permission error: {e}. "
+            "Assuming CUDA is not available.",
+            stacklevel=2,
+        )
+        return None
+    detector = context.Process(
+        target=_detector_target, args=(queue,), name="CUDA driver detector", daemon=True
+    )
+    try:
+        detector.start()
+        detector.join(timeout=60.0)
+    finally:
+        detector.kill()
+    if queue.empty():
+        return None
+    result: DetectionResult | None = queue.get()
+    return result
