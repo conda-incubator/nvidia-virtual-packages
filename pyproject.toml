@@ -28,8 +28,7 @@ classifiers = [
 test = ["pytest", "pytest-benchmark", "pytest-cov", "pytest-timeout", "pytest-pikachu"]
 
 [project.entry-points.conda]
-cuda = "nvidia_virtual_packages.cuda.version"
-cuda-arch = "nvidia_virtual_packages.cuda.arch"
+cuda = "nvidia_virtual_packages.cuda.plugin"
 
 [project.urls]
 repository = "https://github.com/conda-incubator/nvidia-virtual-packages"

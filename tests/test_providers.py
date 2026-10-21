@@ -7,7 +7,7 @@ import pytest
 from conda.plugins import manager
 from conda.plugins.virtual_packages import cuda as builtin_cuda
 
-from nvidia_virtual_packages.cuda import _ctypes, arch, version
+from nvidia_virtual_packages.cuda import _ctypes, arch, plugin, version
 
 DETECTED = ((12, 4), [(9, 0), (8, 0)])
 
@@ -39,7 +39,7 @@ def records(monkeypatch):
         ):
             cached.cache_clear()
         pm = manager.get_plugin_manager()
-        pm.load_plugins(version, arch)  # no-op when already loaded via entry points
+        pm.load_plugins(plugin)  # no-op when already loaded via entry points
         found = {r.name: r for r in pm.get_virtual_package_records()}
         return found, calls
 

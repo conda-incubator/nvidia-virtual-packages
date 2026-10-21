@@ -37,8 +37,6 @@ from __future__ import annotations
 import functools
 import os
 
-from conda import plugins
-
 from nvidia_virtual_packages.cuda._ctypes import detect
 
 
@@ -94,13 +92,3 @@ def get_minimum_sm():
 
     minimum_sm_major, minimum_sm_minor = min(capabilities)
     return f"{minimum_sm_major}.{minimum_sm_minor}"
-
-
-@plugins.hookimpl
-def conda_virtual_packages():
-    # According to CEP-26, we should only create the virtual package if we can detect the
-    # driver and devices; get_minimum_sm returns NULL otherwise. Passing it as a callable
-    # defers detection until conda needs the record.
-    yield plugins.types.CondaVirtualPackage(
-        name="cuda_arch", version=get_minimum_sm, build="0"
-    )
