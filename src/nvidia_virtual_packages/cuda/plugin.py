@@ -5,7 +5,7 @@
 conda ships a built-in ``__cuda`` virtual package, and raises ``PluginError`` when two plugins
 provide the same virtual package. This plugin replaces conda's built-in provider using a pluggy
 hook wrapper: it removes the other ``cuda`` result before conda evaluates it, so conda's own
-driver probe never runs, and adds its own. Both virtual packages share one driver probe.
+driver probe never runs, and adds its own. Both virtual packages share one detection.
 """
 
 from conda import plugins

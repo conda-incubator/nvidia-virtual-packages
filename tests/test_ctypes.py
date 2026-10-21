@@ -42,3 +42,17 @@ def test_candidate_library_names(monkeypatch, system, expected):
     # harmless for the other platforms, which never call ``architecture()``.
     monkeypatch.setattr("platform.architecture", lambda: ("64bit", ""))
     assert _candidate_library_names(system) == expected
+
+
+def test_probe_reports_driver_without_devices(monkeypatch):
+    from nvidia_virtual_packages.cuda import _ctypes
+    from nvidia_virtual_packages.cuda.detection import CUDASystemInfo
+
+    def no_devices(library):
+        raise _ctypes.NVIDIAVirtualPackageError("no devices")
+
+    monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
+    monkeypatch.setattr(_ctypes, "init_driver", object)
+    monkeypatch.setattr(_ctypes, "driver_get_version", lambda library: (12, 4))
+    monkeypatch.setattr(_ctypes, "device_get_count", no_devices)
+    assert _ctypes.probe() == CUDASystemInfo((12, 4), [])

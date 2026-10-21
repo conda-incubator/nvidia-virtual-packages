@@ -3,8 +3,7 @@
 """Define a virtual package exposing the CUDA versions supported by the system.
 
 conda ships a built-in ``__cuda`` virtual package; :mod:`nvidia_virtual_packages.cuda.plugin`
-replaces it with this implementation so the driver is probed only once, shared with
-``__cuda_arch``.
+replaces it with this implementation so that it shares one detection with ``__cuda_arch``.
 
 # Specification
 
@@ -24,20 +23,19 @@ If the `CONDA_OVERRIDE_CUDA` environment variable is set to a non-empty value th
 parsed as a version string, the `__cuda` virtual package MUST be exposed with that version.
 """
 
-from nvidia_virtual_packages.cuda._ctypes import detect
+from nvidia_virtual_packages.cuda.detection import detect
 
 
 def get_cuda_version():
     """Try to detect the newest CUDA version with full driver support.
 
-    The probe itself is cached by :func:`detect`. NULL is returned (rather than None) so
-    that conda's ``to_virtual_package`` suppresses the ``__cuda`` package when no driver is
-    present.
+    NULL is returned (rather than None) so that conda's ``to_virtual_package`` suppresses
+    the ``__cuda`` package when no driver is present.
     """
     from conda.auxlib import NULL
 
     result = detect()
     if result is None:
         return NULL
-    (major, minor), _ = result
+    major, minor = result.driver_version
     return f"{major}.{minor}"

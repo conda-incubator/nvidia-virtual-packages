@@ -34,10 +34,10 @@ If the `CONDA_OVERRIDE_CUDA_ARCH` environment variable is set to the empty strin
 
 from __future__ import annotations
 
-import functools
 import os
 
-from nvidia_virtual_packages.cuda._ctypes import detect
+from nvidia_virtual_packages.cuda.detection import detect
+from nvidia_virtual_packages.cuda.version import get_cuda_version
 
 
 def _get_override(name: str) -> str | None:
@@ -55,7 +55,6 @@ def _get_override(name: str) -> str | None:
     return None if value is None else value.strip()
 
 
-@functools.cache
 def get_minimum_sm():
     """Try to detect the minimum SM of CUDA devices on the system.
 
@@ -84,8 +83,8 @@ def get_minimum_sm():
             )
             return NULL
         # __cuda must be present for __cuda_arch to be exposed. If the user has asserted
-        # CUDA via CONDA_OVERRIDE_CUDA, trust them; otherwise require a real driver.
-        if cuda_override is None and detect() is None:
+        # CUDA via CONDA_OVERRIDE_CUDA, trust them; otherwise __cuda must be detected.
+        if cuda_override is None and get_cuda_version() is NULL:
             import warnings
 
             warnings.warn(
@@ -97,11 +96,8 @@ def get_minimum_sm():
         return override
 
     result = detect()
-    if result is None:
-        return NULL
-    _, capabilities = result
-    if not capabilities:
+    if result is None or not result.compute_capabilities:
         return NULL
 
-    minimum_sm_major, minimum_sm_minor = min(capabilities)
+    minimum_sm_major, minimum_sm_minor = min(result.compute_capabilities)
     return f"{minimum_sm_major}.{minimum_sm_minor}"
