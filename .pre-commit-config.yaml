@@ -5,6 +5,8 @@ repos:
     rev: v5.0.0
     hooks:
       - id: check-yaml
+        # conda-build recipes are Jinja templates, not valid YAML
+        exclude: ^tests/features/meta\.yaml$
       - id: end-of-file-fixer
         exclude: LICENCE
 
@@ -20,7 +22,7 @@ repos:
     hooks:
       - id: mypy
         args: ["--config-file", "pyproject.toml"]
-        files: ^nvidia_virtual_packages(.*)\.py$
+        files: ^src/nvidia_virtual_packages(.*)\.py$
 
   - repo: https://github.com/codespell-project/codespell
     rev: "v2.4.1"
