@@ -18,22 +18,19 @@ driver formatted as ``{major}.{minor}`` and the build string is ``0``. Detection
 suppresses ``__cuda``, and a non-empty value overrides the version.
 """
 
-import functools
-
 from conda import plugins
-from conda.auxlib import NULL
 
 from nvidia_virtual_packages.cuda._ctypes import detect
 
 
-@functools.cache
 def get_cuda_version():
     """Try to detect the newest CUDA version with full driver support.
 
-    The result is cached so the driver is probed only once per process. NULL is returned
-    (rather than None) so that conda's ``to_virtual_package`` suppresses the ``__cuda``
+    The probe itself is cached by :func:`detect`. NULL is returned (rather than None) so that conda's ``to_virtual_package`` suppresses the ``__cuda``
     package when no driver is present.
     """
+    from conda.auxlib import NULL
+
     result = detect()
     if result is None:
         return NULL

@@ -33,7 +33,6 @@ def records(monkeypatch):
         monkeypatch.setattr(version, "detect", fake_detect)
         monkeypatch.setattr(arch, "detect", fake_detect)
         for cached in (
-            version.get_cuda_version,
             arch.get_minimum_sm,
             builtin_cuda.cached_cuda_version,
             manager.get_plugin_manager,

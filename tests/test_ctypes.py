@@ -40,8 +40,5 @@ from nvidia_virtual_packages.cuda._ctypes import _candidate_library_names
 def test_candidate_library_names(monkeypatch, system, expected):
     # Pin the reported bitness so the Windows candidate name is deterministic;
     # harmless for the other platforms, which never call ``architecture()``.
-    monkeypatch.setattr(
-        "nvidia_virtual_packages.cuda._ctypes.platform.architecture",
-        lambda: ("64bit", ""),
-    )
+    monkeypatch.setattr("platform.architecture", lambda: ("64bit", ""))
     assert _candidate_library_names(system) == expected

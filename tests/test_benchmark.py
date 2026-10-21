@@ -27,7 +27,6 @@ from nvidia_virtual_packages.cuda.version import get_cuda_version
 def _clear_caches() -> None:
     """Drop every cached driver-probe result so the next call is cold."""
     detect.cache_clear()
-    get_cuda_version.cache_clear()
     get_minimum_sm.cache_clear()
 
 

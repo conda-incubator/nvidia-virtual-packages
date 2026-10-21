@@ -12,7 +12,6 @@ from __future__ import annotations
 import contextlib
 import enum
 import functools
-import platform
 import typing
 
 # ctypes is imported lazily inside the functions that use it to keep plugin import time low.
@@ -53,6 +52,8 @@ def _candidate_library_names(system: str) -> list[str]:
         vendor-dir, and WSL locations. There is intentionally no
         ``find_library`` fallback: the list is exhaustive and deterministic.
     """
+    import platform
+
     if system == "Windows":
         bits = platform.architecture()[0].replace("bit", "")
         return [f"nvcuda{bits}.dll", "nvcuda.dll"]
@@ -76,16 +77,13 @@ def _candidate_library_names(system: str) -> list[str]:
     return []
 
 
-@functools.cache
 def init_driver() -> DLL:
     """Initialize the CUDA driver API.
 
-    The loaded, initialized library handle is cached so the driver is loaded and
-    ``cuInit`` is called at most once per process, shared across every virtual
-    package that needs it. ``functools.cache`` does not memoize exceptions, so a
-    failed load is retried on the next call.
+    Called only in the detector child process; see :func:`detect`.
     """
     import ctypes
+    import platform
 
     library: DLL
     system = platform.system()

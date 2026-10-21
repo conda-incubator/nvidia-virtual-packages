@@ -43,19 +43,24 @@ from nvidia_virtual_packages.cuda._ctypes import detect
 
 
 @functools.cache
-def get_minimum_sm() -> str | None:
-    """Try to detect the minimum SM of CUDA devices on the system."""
+def get_minimum_sm():
+    """Try to detect the minimum SM of CUDA devices on the system.
+
+    Returns NULL (rather than None) when ``__cuda_arch`` must be absent, so that conda's
+    ``to_virtual_package`` drops it; conda calls this lazily, only when it is needed.
+    """
+    from conda.auxlib import NULL
 
     if (
         "CONDA_OVERRIDE_CUDA" in os.environ
         and os.environ["CONDA_OVERRIDE_CUDA"].strip() == ""
     ):
-        return None
+        return NULL
 
     if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
         override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip()
         if override == "":
-            return None
+            return NULL
         import re
 
         if not re.fullmatch(r"[0-9]+\.[0-9]+", override):
@@ -66,7 +71,7 @@ def get_minimum_sm() -> str | None:
                 f"The __cuda_arch virtual package will not be created. "
                 f"Overrides must be of the form: CONDA_OVERRIDE_CUDA_ARCH=0.1"
             )
-            return None
+            return NULL
         # __cuda must be present for __cuda_arch to be exposed. If the user has asserted
         # CUDA via CONDA_OVERRIDE_CUDA, trust them; otherwise require a real driver.
         if "CONDA_OVERRIDE_CUDA" not in os.environ and detect() is None:
@@ -77,15 +82,15 @@ def get_minimum_sm() -> str | None:
                 f"or CONDA_OVERRIDE_CUDA were detected. "
                 f"The __cuda_arch virtual package will not be created."
             )
-            return None
+            return NULL
         return override
 
     result = detect()
     if result is None:
-        return None
+        return NULL
     _, capabilities = result
     if not capabilities:
-        return None
+        return NULL
 
     minimum_sm_major, minimum_sm_minor = min(capabilities)
     return f"{minimum_sm_major}.{minimum_sm_minor}"
@@ -93,10 +98,9 @@ def get_minimum_sm() -> str | None:
 
 @plugins.hookimpl
 def conda_virtual_packages():
-    minimum_sm = get_minimum_sm()
-    if minimum_sm is not None:
-        # According to CEP-26, we should only create the virtual package if we can
-        # detect the driver and devices
-        yield plugins.types.CondaVirtualPackage(
-            name="cuda_arch", version=minimum_sm, build="0"
-        )
+    # According to CEP-26, we should only create the virtual package if we can detect the
+    # driver and devices; get_minimum_sm returns NULL otherwise. Passing it as a callable
+    # defers detection until conda needs the record.
+    yield plugins.types.CondaVirtualPackage(
+        name="cuda_arch", version=get_minimum_sm, build="0"
+    )
