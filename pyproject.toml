@@ -4,7 +4,8 @@ name = "nvidia-virtual-packages"
 description = "Provides conda virtual packages for NVIDIA hardware."
 license = "BSD-3-Clause"
 readme = "README.md"
-requires-python = ">=3.10"
+# conda>=25.11, which this plugin requires, is not built for Python 3.10.
+requires-python = ">=3.11"
 authors = [
   { name = "Daniel Ching", email = "dching@nvidia.com" },
 ]
@@ -114,7 +115,7 @@ section-order = [
 [tool.mypy]
 # https://github.com/python/mypy
 # https://mypy.readthedocs.io/en/latest/config_file.html#using-a-pyproject-toml-file
-python_version = "3.10"
+python_version = "3.11"
 files = [
   "src/nvidia_virtual_packages",
   "tests"
