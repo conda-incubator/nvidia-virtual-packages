@@ -4,16 +4,26 @@
 
 This implementation uses ctypes to call the CUDA driver API.
 
-# Specification
-
 conda ships a built-in ``__cuda`` virtual package; :mod:`nvidia_virtual_packages.cuda.plugin`
 replaces it with this implementation so the driver is probed only once, shared with
 ``__cuda_arch``.
 
-When exposed, the version value is set to the newest CUDA version fully supported by the
-driver formatted as ``{major}.{minor}`` and the build string is ``0``. Detection honors the
-``CONDA_OVERRIDE_CUDA`` environment variable with conda's built-in semantics: an empty value
-suppresses ``__cuda``, and a non-empty value overrides the version.
+# Specification
+
+From CEP 30 (https://github.com/conda/ceps/blob/main/cep-0030.md):
+
+This virtual package MUST be present when the system exhibits NVIDIA GPU drivers compatible
+with the CUDA runtimes. For systems without such support, the virtual package MUST NOT be
+present.
+
+When available, the version value MUST be set to the latest CUDA version supported by the
+detected drivers (i.e. the formatted value of `cuDriverGetVersion()`), constrained to the first
+two components (major and minor) and formatted as `{major}.{minor}`.
+
+The build string MUST be `0`.
+
+If the `CONDA_OVERRIDE_CUDA` environment variable is set to a non-empty value that can be
+parsed as a version string, the `__cuda` virtual package MUST be exposed with that version.
 """
 
 from nvidia_virtual_packages.cuda._ctypes import detect
