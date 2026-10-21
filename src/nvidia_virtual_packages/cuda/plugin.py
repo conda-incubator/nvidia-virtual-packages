@@ -35,7 +35,7 @@ def conda_virtual_packages():
                 # non-empty -> that version.
                 override_entity="version",
             ),
-            # According to CEP-26, __cuda_arch is only created if the driver and devices are
+            # According to CEP 46, __cuda_arch is only created if the driver and devices are
             # detected; get_minimum_sm returns NULL otherwise.
             plugins.types.CondaVirtualPackage(
                 name="cuda_arch", version=get_minimum_sm, build="0"

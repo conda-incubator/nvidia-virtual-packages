@@ -6,6 +6,8 @@ This implementation uses ctypes to call the CUDA driver API.
 
 # Specification
 
+From CEP 46 (https://github.com/conda/ceps/blob/main/cep-0046.md):
+
 Implementing the `__cuda_arch` virtual package is RECOMMENDED. If a conda-compatible client
 chooses to implement the `__cuda_arch` virtual package, it MUST follow these specifications:
 

@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Define a virtual package exposing the CUDA versions supported by the system.
 
-This implementation uses ctypes to call the CUDA driver API.
-
 conda ships a built-in ``__cuda`` virtual package; :mod:`nvidia_virtual_packages.cuda.plugin`
 replaces it with this implementation so the driver is probed only once, shared with
 ``__cuda_arch``.
