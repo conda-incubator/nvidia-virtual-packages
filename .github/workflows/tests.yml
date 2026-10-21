@@ -51,34 +51,4 @@ jobs:
         run: python -m pytest tests
 
   upstream:
-    # conda's own __cuda tests, run with this plugin replacing conda's built-in provider.
-    name: conda's __cuda tests
-    runs-on: ubuntu-latest
-    env:
-      # Must match the tag that the tests/upstream/conda submodule is pinned to.
-      CONDA_VERSION: "26.9.3"
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          submodules: true
-
-      - uses: conda-incubator/setup-miniconda@v3
-        with:
-          miniforge-version: latest
-          activate-environment: test
-          python-version: "3.13"
-          conda-remove-defaults: true
-
-      - name: Install conda, its test requirements, and the plugin
-        run: |
-          git -C tests/upstream/conda fetch --depth 1 origin tag "$CONDA_VERSION"
-          test "$(git -C tests/upstream/conda rev-parse HEAD)" \
-            = "$(git -C tests/upstream/conda rev-parse "$CONDA_VERSION^{commit}")"
-          conda install --yes "conda=$CONDA_VERSION" pytest pytest-mock pytest-xprocess \
-            pytest-rerunfailures pytest-timeout responses flask werkzeug pexpect \
-            importlib_resources
-          python -m pip install --no-deps -e .
-
-      - name: Run conda's __cuda tests
-        run: tests/upstream/run.sh
+    uses: ./.github/workflows/upstream.yml

@@ -1,0 +1,79 @@
+name: Upstream conda tests
+
+# conda's own __cuda tests, run with this plugin replacing conda's built-in provider. Called by
+# the Tests workflow for the release that the tests/upstream/conda submodule is pinned to, and by
+# the Canary workflow for conda's development builds.
+on:
+  workflow_call:
+    inputs:
+      canary:
+        description: >-
+          Test conda's latest development build from conda-canary instead of the release that
+          the submodule is pinned to.
+        type: boolean
+        default: false
+
+defaults:
+  run:
+    # A login shell activates the conda environment created by setup-miniconda.
+    shell: bash -el {0}
+
+jobs:
+  upstream:
+    name: Upstream conda tests (${{ matrix.os }}, ${{ inputs.canary && 'canary' || 'pinned' }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: test
+          python-version: "3.13"
+          conda-remove-defaults: true
+
+      - name: Install conda and check out its tests at the same commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ inputs.canary }}" = "true" ]; then
+            # List the canary channel first; with strict channel priority, conda-forge's conda
+            # would otherwise exclude it.
+            conda install --yes -c conda-canary/label/dev "conda-canary/label/dev::conda"
+            # Development builds are versioned like 26.9.3.50+gf747d5e19.
+            short="$(python -m conda --version | sed -n 's/.*+g\([0-9a-f]*\).*/\1/p')"
+            test -n "$short"
+            # A shallow fetch needs the full commit hash.
+            commit="$(gh api "repos/conda/conda/commits/$short" --jq .sha)"
+            git -C tests/upstream/conda fetch --depth 1 origin "$commit"
+            git -C tests/upstream/conda checkout --quiet FETCH_HEAD
+          else
+            # The tag that the submodule is pinned to.
+            version="$(git -C tests/upstream/conda describe --tags --exact-match 2>/dev/null \
+              || git -C tests/upstream/conda ls-remote --tags origin \
+              | awk -v head="$(git -C tests/upstream/conda rev-parse HEAD)" \
+                '$1 == head { sub("refs/tags/", "", $2); sub("\\^\\{\\}$", "", $2); print $2; exit }')"
+            test -n "$version"
+            conda install --yes "conda=$version"
+          fi
+          python -m conda --version
+
+      - name: Install the test requirements and the plugin
+        run: |
+          conda install --yes pytest pytest-mock pytest-xprocess pytest-rerunfailures \
+            pytest-timeout responses flask werkzeug pexpect importlib_resources
+          python -m pip install -e ".[test]"
+
+      - name: Run conda's __cuda tests
+        run: tests/upstream/run.sh
+
+      - name: Run this plugin's tests
+        if: inputs.canary
+        run: python -m pytest tests
