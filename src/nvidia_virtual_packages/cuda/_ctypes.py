@@ -210,7 +210,12 @@ def detect() -> DetectionResult | None:
     providers share this cached result.
     """
     import multiprocessing
+    import platform
     import warnings
+
+    # Shortcut, as in conda's built-in detector: CUDA is not available on Apple silicon.
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        return None
 
     try:
         context = multiprocessing.get_context("spawn")

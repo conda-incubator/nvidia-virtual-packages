@@ -105,3 +105,46 @@ def test_detect_permission_error(monkeypatch):
             assert _ctypes.detect() is None
     finally:
         _ctypes.detect.cache_clear()
+
+
+@pytest.fixture
+def config_overrides(monkeypatch):
+    """Set ``override_virtual_packages`` as if it came from the conda configuration."""
+    from conda.base.context import context
+
+    def set_overrides(overrides):
+        monkeypatch.setattr(
+            type(context), "override_virtual_packages", property(lambda self: overrides)
+        )
+
+    return set_overrides
+
+
+def test_config_overrides(records, config_overrides):
+    config_overrides({"cuda": "12.0", "cuda_arch": "7.5"})
+    found, calls = records()
+    assert found["__cuda"].version == "12.0"
+    assert found["__cuda_arch"].version == "7.5"
+    assert not calls
+
+
+def test_empty_config_cuda_override_hides_both(records, config_overrides):
+    config_overrides({"cuda": ""})
+    found, calls = records()
+    assert "__cuda" not in found
+    assert "__cuda_arch" not in found
+    assert not calls
+
+
+def test_detect_skips_apple_silicon(monkeypatch):
+    def no_spawn(method):
+        raise AssertionError("must not spawn a detector on Apple silicon")
+
+    monkeypatch.setattr("platform.system", lambda: "Darwin")
+    monkeypatch.setattr("platform.machine", lambda: "arm64")
+    monkeypatch.setattr("multiprocessing.get_context", no_spawn)
+    _ctypes.detect.cache_clear()
+    try:
+        assert _ctypes.detect() is None
+    finally:
+        _ctypes.detect.cache_clear()

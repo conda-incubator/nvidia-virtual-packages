@@ -2,8 +2,6 @@
 # SPDX-License-Identifier: BSD-3-Clause
 """Define a virtual package exposing the minimum arch of CUDA devices on the system.
 
-This implementation uses ctypes to call the CUDA driver API.
-
 # Specification
 
 From CEP 46 (https://github.com/conda/ceps/blob/main/cep-0046.md):
@@ -42,6 +40,21 @@ import os
 from nvidia_virtual_packages.cuda._ctypes import detect
 
 
+def _get_override(name: str) -> str | None:
+    """Return the override for virtual package ``name``, as conda resolves it.
+
+    Like ``CondaVirtualPackage.to_virtual_package``, the ``CONDA_OVERRIDE_<NAME>`` environment
+    variable takes precedence over ``override_virtual_packages`` in the conda configuration.
+    """
+    value = os.getenv(f"CONDA_OVERRIDE_{name.upper()}")
+    if value is None:
+        from conda.base.context import context
+
+        if context.override_virtual_packages:
+            value = context.override_virtual_packages.get(name)
+    return None if value is None else value.strip()
+
+
 @functools.cache
 def get_minimum_sm():
     """Try to detect the minimum SM of CUDA devices on the system.
@@ -51,14 +64,12 @@ def get_minimum_sm():
     """
     from conda.auxlib import NULL
 
-    if (
-        "CONDA_OVERRIDE_CUDA" in os.environ
-        and os.environ["CONDA_OVERRIDE_CUDA"].strip() == ""
-    ):
+    cuda_override = _get_override("cuda")
+    if cuda_override == "":
         return NULL
 
-    if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
-        override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip()
+    override = _get_override("cuda_arch")
+    if override is not None:
         if override == "":
             return NULL
         import re
@@ -74,7 +85,7 @@ def get_minimum_sm():
             return NULL
         # __cuda must be present for __cuda_arch to be exposed. If the user has asserted
         # CUDA via CONDA_OVERRIDE_CUDA, trust them; otherwise require a real driver.
-        if "CONDA_OVERRIDE_CUDA" not in os.environ and detect() is None:
+        if cuda_override is None and detect() is None:
             import warnings
 
             warnings.warn(
