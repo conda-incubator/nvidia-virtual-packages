@@ -9,8 +9,10 @@ replaced without changing how the virtual packages or their overrides are constr
 The policy around detection follows conda's built-in ``__cuda`` detector
 (``conda/plugins/virtual_packages/cuda.py``): detection runs in a spawned child process with a
 timeout, so a hung or crashing driver cannot take conda down, and Apple silicon is skipped.
-The method itself is
-:func:`nvidia_virtual_packages.cuda._driver.probe`.
+
+The method is chosen by the ``NVIDIA_VIRTUAL_PACKAGES_DETECTION`` environment variable:
+``driver`` (the default) uses the CUDA driver API (:func:`nvidia_virtual_packages.cuda._driver.probe`),
+and ``nvml`` uses NVML (:func:`nvidia_virtual_packages.cuda._nvml.probe`).
 """
 
 from __future__ import annotations
@@ -20,6 +22,12 @@ import typing
 
 if typing.TYPE_CHECKING:
     import multiprocessing.queues
+
+#: The modules implementing each detection method; each provides ``probe() -> CUDASystemInfo``.
+_METHODS = {
+    "driver": "nvidia_virtual_packages.cuda._driver",
+    "nvml": "nvidia_virtual_packages.cuda._nvml",
+}
 
 
 class CUDASystemInfo(typing.NamedTuple):
@@ -33,13 +41,13 @@ class CUDASystemInfo(typing.NamedTuple):
 
 
 def _detector_target(
-    queue: multiprocessing.queues.SimpleQueue[CUDASystemInfo | None],
+    queue: multiprocessing.queues.SimpleQueue[CUDASystemInfo | None], module: str
 ) -> None:
-    """Run the detection method in the child process and put the result on ``queue``."""
+    """Run the detection method in ``module`` in the child process; put the result on ``queue``."""
     try:
-        from nvidia_virtual_packages.cuda._driver import probe
+        import importlib
 
-        queue.put(probe())
+        queue.put(importlib.import_module(module).probe())
     except Exception:
         queue.put(None)
 
@@ -51,8 +59,20 @@ def detect() -> CUDASystemInfo | None:
     The result is cached, so detection runs at most once per process.
     """
     import multiprocessing
+    import os
     import platform
     import warnings
+
+    method = (
+        os.getenv("NVIDIA_VIRTUAL_PACKAGES_DETECTION", "").strip().lower() or "driver"
+    )
+    if method not in _METHODS:
+        warnings.warn(
+            f"Unknown CUDA detection method in NVIDIA_VIRTUAL_PACKAGES_DETECTION ({method}). "
+            f"Using the CUDA driver API instead. Valid methods are: {', '.join(_METHODS)}",
+            stacklevel=2,
+        )
+        method = "driver"
 
     if platform.system() == "Darwin" and platform.machine() == "arm64":
         return None
@@ -68,7 +88,10 @@ def detect() -> CUDASystemInfo | None:
         )
         return None
     detector = context.Process(
-        target=_detector_target, args=(queue,), name="CUDA driver detector", daemon=True
+        target=_detector_target,
+        args=(queue, _METHODS[method]),
+        name="CUDA driver detector",
+        daemon=True,
     )
     try:
         detector.start()

@@ -41,3 +41,55 @@ def test_detect_skips_apple_silicon(monkeypatch):
     monkeypatch.setattr("platform.machine", lambda: "arm64")
     monkeypatch.setattr("multiprocessing.get_context", no_spawn)
     assert detection.detect() is None
+
+
+@pytest.fixture
+def spawned(monkeypatch):
+    """Record the method module that detect() passes to the child, without spawning."""
+    import multiprocessing
+
+    modules = []
+    context = multiprocessing.get_context("spawn")
+
+    class Process:
+        def __init__(self, target, args, **kwargs):
+            modules.append(args[1])
+
+        def start(self):
+            pass
+
+        def join(self, timeout):
+            pass
+
+        def kill(self):
+            pass
+
+    monkeypatch.setattr(context, "Process", Process)
+    monkeypatch.setattr("multiprocessing.get_context", lambda method: context)
+    monkeypatch.setattr("platform.machine", lambda: "x86_64")
+    return modules
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, "nvidia_virtual_packages.cuda._driver"),
+        ("", "nvidia_virtual_packages.cuda._driver"),
+        ("driver", "nvidia_virtual_packages.cuda._driver"),
+        (" NVML ", "nvidia_virtual_packages.cuda._nvml"),
+    ],
+)
+def test_detect_selects_method(monkeypatch, spawned, value, expected):
+    if value is None:
+        monkeypatch.delenv("NVIDIA_VIRTUAL_PACKAGES_DETECTION", raising=False)
+    else:
+        monkeypatch.setenv("NVIDIA_VIRTUAL_PACKAGES_DETECTION", value)
+    assert detection.detect() is None
+    assert spawned == [expected]
+
+
+def test_detect_unknown_method_uses_driver(monkeypatch, spawned):
+    monkeypatch.setenv("NVIDIA_VIRTUAL_PACKAGES_DETECTION", "bogus")
+    with pytest.warns(UserWarning, match="Unknown CUDA detection method"):
+        assert detection.detect() is None
+    assert spawned == ["nvidia_virtual_packages.cuda._driver"]
