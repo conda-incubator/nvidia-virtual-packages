@@ -1,0 +1,4 @@
+[submodule "tests/upstream/conda"]
+	path = tests/upstream/conda
+	url = https://github.com/conda/conda.git
+	shallow = true

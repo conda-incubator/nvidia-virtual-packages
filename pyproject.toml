@@ -119,6 +119,7 @@ files = [
   "src/nvidia_virtual_packages",
   "tests"
 ]
+exclude = ["^tests/upstream/"]
 pretty = true
 show_traceback = true
 color_output = true
@@ -154,7 +155,8 @@ norecursedirs =[
   "docs",
   ".tox",
   ".git",
-  "__pycache__"
+  "__pycache__",
+  "upstream"  # conda's own tests; run them with tests/upstream/run.sh
 ]
 doctest_optionflags = ["NUMBER", "NORMALIZE_WHITESPACE", "IGNORE_EXCEPTION_DETAIL"]
 timeout = 10
