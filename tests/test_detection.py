@@ -26,6 +26,8 @@ def test_detect_permission_error(monkeypatch):
     def deny(method):
         raise PermissionError("denied")
 
+    # Detection, and so the permission error, is skipped on Apple silicon.
+    monkeypatch.setattr("platform.machine", lambda: "x86_64")
     monkeypatch.setattr("multiprocessing.get_context", deny)
     with pytest.warns(UserWarning, match="permission error"):
         assert detection.detect() is None
