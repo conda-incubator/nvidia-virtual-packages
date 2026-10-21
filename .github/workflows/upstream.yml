@@ -59,7 +59,7 @@ jobs:
             version="$(git -C tests/upstream/conda describe --tags --exact-match 2>/dev/null \
               || git -C tests/upstream/conda ls-remote --tags origin \
               | awk -v head="$(git -C tests/upstream/conda rev-parse HEAD)" \
-                '$1 == head { sub("refs/tags/", "", $2); sub("\\^\\{\\}$", "", $2); print $2; exit }')"
+                '$1 == head && !found { sub("refs/tags/", "", $2); sub("\\^\\{\\}$", "", $2); print $2; found = 1 }')"
             test -n "$version"
             conda install --yes "conda=$version"
           fi
