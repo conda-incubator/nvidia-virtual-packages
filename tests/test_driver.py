@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import pytest
 
-from nvidia_virtual_packages.cuda._ctypes import _candidate_library_names
+from nvidia_virtual_packages.cuda._driver import _candidate_library_names
 
 
 @pytest.mark.parametrize(
@@ -45,14 +45,14 @@ def test_candidate_library_names(monkeypatch, system, expected):
 
 
 def test_probe_reports_driver_without_devices(monkeypatch):
-    from nvidia_virtual_packages.cuda import _ctypes
+    from nvidia_virtual_packages.cuda import _driver
     from nvidia_virtual_packages.cuda.detection import CUDASystemInfo
 
     def no_devices(library):
-        raise _ctypes.NVIDIAVirtualPackageError("no devices")
+        raise _driver.NVIDIAVirtualPackageError("no devices")
 
     monkeypatch.delenv("CUDA_VISIBLE_DEVICES", raising=False)
-    monkeypatch.setattr(_ctypes, "init_driver", object)
-    monkeypatch.setattr(_ctypes, "driver_get_version", lambda library: (12, 4))
-    monkeypatch.setattr(_ctypes, "device_get_count", no_devices)
-    assert _ctypes.probe() == CUDASystemInfo((12, 4), [])
+    monkeypatch.setattr(_driver, "init_driver", object)
+    monkeypatch.setattr(_driver, "driver_get_version", lambda library: (12, 4))
+    monkeypatch.setattr(_driver, "device_get_count", no_devices)
+    assert _driver.probe() == CUDASystemInfo((12, 4), [])

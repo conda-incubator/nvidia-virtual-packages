@@ -10,7 +10,7 @@ The policy around detection follows conda's built-in ``__cuda`` detector
 (``conda/plugins/virtual_packages/cuda.py``): detection runs in a spawned child process with a
 timeout, so a hung or crashing driver cannot take conda down, and Apple silicon is skipped.
 The method itself is
-:func:`nvidia_virtual_packages.cuda._ctypes.probe`.
+:func:`nvidia_virtual_packages.cuda._driver.probe`.
 """
 
 from __future__ import annotations
@@ -37,7 +37,7 @@ def _detector_target(
 ) -> None:
     """Run the detection method in the child process and put the result on ``queue``."""
     try:
-        from nvidia_virtual_packages.cuda._ctypes import probe
+        from nvidia_virtual_packages.cuda._driver import probe
 
         queue.put(probe())
     except Exception:
