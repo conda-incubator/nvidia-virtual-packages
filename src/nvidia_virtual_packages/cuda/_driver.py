@@ -24,7 +24,22 @@ if typing.TYPE_CHECKING:
 
 
 class CUresult(enum.IntEnum):
+    """The ``CUresult`` codes that ``cuInit`` may return, from ``cuda.h``.
+
+    ``cuGetErrorName`` fails until ``cuInit`` succeeds, so hardcode these likely errors.
+    """
+
     CUDA_SUCCESS = 0
+    CUDA_ERROR_INVALID_VALUE = 1
+    CUDA_ERROR_OUT_OF_MEMORY = 2
+    CUDA_ERROR_STUB_LIBRARY = 34
+    CUDA_ERROR_DEVICE_UNAVAILABLE = 46
+    CUDA_ERROR_NO_DEVICE = 100
+    CUDA_ERROR_INVALID_DEVICE = 101
+    CUDA_ERROR_OPERATING_SYSTEM = 304
+    CUDA_ERROR_SYSTEM_DRIVER_MISMATCH = 803
+    CUDA_ERROR_COMPAT_NOT_SUPPORTED_ON_DEVICE = 804
+    CUDA_ERROR_UNKNOWN = 999
 
 
 class CUdevice_attribute(enum.IntEnum):
@@ -77,6 +92,39 @@ def _candidate_library_names(system: str) -> list[str]:
     return []
 
 
+def _error_text(library: DLL, function_name: str, status: int) -> str | None:
+    """Return what ``cuGetErrorName`` or ``cuGetErrorString`` reports for ``status``, if anything."""
+    import ctypes
+
+    with contextlib.suppress(AttributeError):
+        function = getattr(library, function_name)
+        function.argtypes = [ctypes.c_int, ctypes.POINTER(ctypes.c_char_p)]
+        function.restype = ctypes.c_int
+        value = ctypes.c_char_p()
+        if (
+            function(status, ctypes.byref(value)) == CUresult.CUDA_SUCCESS
+            and value.value
+        ):
+            return value.value.decode(errors="replace")
+    return None
+
+
+def _error_string(library: DLL, status: int) -> str:
+    """Describe ``status``, such as
+    ``CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected (100)``.
+
+    The driver only describes errors after ``cuInit`` succeeds; before that, the name comes
+    from :class:`CUresult` and there is no description.
+    """
+    name = _error_text(library, "cuGetErrorName", status)
+    if name is None:
+        with contextlib.suppress(ValueError):
+            name = CUresult(status).name
+    description = _error_text(library, "cuGetErrorString", status)
+    label = f"{name}: {description}" if name and description else name or description
+    return f"{label} ({status})" if label else str(status)
+
+
 def init_driver() -> DLL:
     """Initialize the CUDA driver API.
 
@@ -113,7 +161,9 @@ def init_driver() -> DLL:
 
     status = library.cuInit(0)
     if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to initialize CUDA driver: {status}")
+        raise NVIDIAVirtualPackageError(
+            f"Failed to initialize CUDA driver: {_error_string(library, status)}"
+        )
 
     return library
 
@@ -125,7 +175,9 @@ def driver_get_version(library: DLL) -> tuple[int, int]:
     driver_version = ctypes.c_int(0)
     status = library.cuDriverGetVersion(ctypes.byref(driver_version))
     if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to get CUDA driver version: {status}")
+        raise NVIDIAVirtualPackageError(
+            f"Failed to get CUDA driver version: {_error_string(library, status)}"
+        )
     major = int(driver_version.value / 1000)
     minor = (driver_version.value % 1000) // 10
     return major, minor
@@ -138,7 +190,9 @@ def device_get_count(library: DLL) -> int:
     device_count = ctypes.c_int(0)
     status = library.cuDeviceGetCount(ctypes.byref(device_count))
     if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to get CUDA device count: {status}")
+        raise NVIDIAVirtualPackageError(
+            f"Failed to get CUDA device count: {_error_string(library, status)}"
+        )
     return device_count.value
 
 
@@ -155,7 +209,7 @@ def device_get_attributes(library: DLL, device: int) -> tuple[int, int]:
     )
     if status != CUresult.CUDA_SUCCESS:
         raise NVIDIAVirtualPackageError(
-            f"Failed to get CUDA device compute capability: {status}"
+            f"Failed to get CUDA device compute capability: {_error_string(library, status)}"
         )
     status = library.cuDeviceGetAttribute(
         ctypes.byref(cc_minor),
@@ -164,7 +218,7 @@ def device_get_attributes(library: DLL, device: int) -> tuple[int, int]:
     )
     if status != CUresult.CUDA_SUCCESS:
         raise NVIDIAVirtualPackageError(
-            f"Failed to get CUDA device compute capability: {status}"
+            f"Failed to get CUDA device compute capability: {_error_string(library, status)}"
         )
     return cc_major.value, cc_minor.value
 
@@ -172,8 +226,8 @@ def device_get_attributes(library: DLL, device: int) -> tuple[int, int]:
 def probe() -> CUDASystemInfo:
     """Query the CUDA driver API in-process.
 
-    Raises if no usable driver is found. The device list is empty if the devices cannot be
-    queried, so that the driver version is still reported.
+    Raises if no usable driver is found. Devices that cannot be queried are skipped, so the
+    driver version and the remaining devices are still reported.
 
     The driver only enumerates the devices listed in ``CUDA_VISIBLE_DEVICES``, so, like conda's
     built-in ``__cuda`` detector, it is removed from the environment to see every device. Only
@@ -185,11 +239,11 @@ def probe() -> CUDASystemInfo:
     os.environ.pop("CUDA_VISIBLE_DEVICES", None)
     library = init_driver()
     version = driver_get_version(library)
-    try:
-        capabilities = [
-            device_get_attributes(library, device)
-            for device in range(device_get_count(library))
-        ]
-    except Exception:
-        capabilities = []
+    count = 0
+    with contextlib.suppress(Exception):
+        count = device_get_count(library)
+    capabilities = []
+    for device in range(count):
+        with contextlib.suppress(NVIDIAVirtualPackageError):
+            capabilities.append(device_get_attributes(library, device))
     return CUDASystemInfo(version, capabilities)

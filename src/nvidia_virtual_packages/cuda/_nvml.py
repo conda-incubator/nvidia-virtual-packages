@@ -23,7 +23,40 @@ if typing.TYPE_CHECKING:
 
 
 class NVMLReturn(enum.IntEnum):
+    """The ``nvmlReturn_t`` codes, from ``nvml.h`` (CUDA 13.4)."""
+
     NVML_SUCCESS = 0
+    NVML_ERROR_UNINITIALIZED = 1
+    NVML_ERROR_INVALID_ARGUMENT = 2
+    NVML_ERROR_NOT_SUPPORTED = 3
+    NVML_ERROR_NO_PERMISSION = 4
+    NVML_ERROR_ALREADY_INITIALIZED = 5
+    NVML_ERROR_NOT_FOUND = 6
+    NVML_ERROR_INSUFFICIENT_SIZE = 7
+    NVML_ERROR_INSUFFICIENT_POWER = 8
+    NVML_ERROR_DRIVER_NOT_LOADED = 9
+    NVML_ERROR_TIMEOUT = 10
+    NVML_ERROR_IRQ_ISSUE = 11
+    NVML_ERROR_LIBRARY_NOT_FOUND = 12
+    NVML_ERROR_FUNCTION_NOT_FOUND = 13
+    NVML_ERROR_CORRUPTED_INFOROM = 14
+    NVML_ERROR_GPU_IS_LOST = 15
+    NVML_ERROR_RESET_REQUIRED = 16
+    NVML_ERROR_OPERATING_SYSTEM = 17
+    NVML_ERROR_LIB_RM_VERSION_MISMATCH = 18
+    NVML_ERROR_IN_USE = 19
+    NVML_ERROR_MEMORY = 20
+    NVML_ERROR_NO_DATA = 21
+    NVML_ERROR_VGPU_ECC_NOT_SUPPORTED = 22
+    NVML_ERROR_INSUFFICIENT_RESOURCES = 23
+    NVML_ERROR_FREQ_NOT_SUPPORTED = 24
+    NVML_ERROR_ARGUMENT_VERSION_MISMATCH = 25
+    NVML_ERROR_DEPRECATED = 26
+    NVML_ERROR_NOT_READY = 27
+    NVML_ERROR_GPU_NOT_FOUND = 28
+    NVML_ERROR_INVALID_STATE = 29
+    NVML_ERROR_RESET_TYPE_NOT_SUPPORTED = 30
+    NVML_ERROR_UNKNOWN = 999
 
 
 class NVIDIAVirtualPackageError(RuntimeError):
@@ -85,6 +118,28 @@ def _function(library: DLL, *names: str) -> typing.Any:
     raise NVIDIAVirtualPackageError(f"NVML does not export {names[-1]}")
 
 
+def _error_string(library: DLL, status: int) -> str:
+    """Describe ``status``, such as ``NVML_ERROR_DRIVER_NOT_LOADED: Driver Not Loaded (9)``.
+
+    The name comes from :class:`NVMLReturn` and the description from ``nvmlErrorString``,
+    which works without initializing NVML.
+    """
+    import ctypes
+
+    name = None
+    with contextlib.suppress(ValueError):
+        name = NVMLReturn(status).name
+    description = None
+    with contextlib.suppress(NVIDIAVirtualPackageError):
+        function = _function(library, "nvmlErrorString")
+        function.argtypes = [ctypes.c_int]
+        function.restype = ctypes.c_char_p
+        if value := function(status):
+            description = value.decode(errors="replace")
+    label = f"{name}: {description}" if name and description else name or description
+    return f"{label} ({status})" if label else str(status)
+
+
 def init_nvml() -> DLL:
     """Load and initialize NVML.
 
@@ -111,7 +166,9 @@ def init_nvml() -> DLL:
     init.restype = ctypes.c_int
     status = init()
     if status != NVMLReturn.NVML_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to initialize NVML: {status}")
+        raise NVIDIAVirtualPackageError(
+            f"Failed to initialize NVML: {_error_string(library, status)}"
+        )
     return library
 
 
@@ -136,7 +193,9 @@ def system_get_cuda_driver_version(library: DLL) -> tuple[int, int]:
     version = ctypes.c_int(0)
     status = function(ctypes.byref(version))
     if status != NVMLReturn.NVML_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to get CUDA driver version: {status}")
+        raise NVIDIAVirtualPackageError(
+            f"Failed to get CUDA driver version: {_error_string(library, status)}"
+        )
     return version.value // 1000, (version.value % 1000) // 10
 
 
@@ -150,7 +209,9 @@ def device_get_count(library: DLL) -> int:
     count = ctypes.c_uint(0)
     status = function(ctypes.byref(count))
     if status != NVMLReturn.NVML_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to get device count: {status}")
+        raise NVIDIAVirtualPackageError(
+            f"Failed to get device count: {_error_string(library, status)}"
+        )
     return count.value
 
 
@@ -167,9 +228,11 @@ def device_get_compute_capability(library: DLL, index: int) -> tuple[int, int]:
     handle = ctypes.c_void_p()
     status = get_handle(index, ctypes.byref(handle))
     if status != NVMLReturn.NVML_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to get device handle: {status}")
+        raise NVIDIAVirtualPackageError(
+            f"Failed to get device handle: {_error_string(library, status)}"
+        )
 
-    get_capability = library.nvmlDeviceGetCudaComputeCapability
+    get_capability = _function(library, "nvmlDeviceGetCudaComputeCapability")
     get_capability.argtypes = [
         ctypes.c_void_p,
         ctypes.POINTER(ctypes.c_int),
@@ -181,7 +244,7 @@ def device_get_compute_capability(library: DLL, index: int) -> tuple[int, int]:
     status = get_capability(handle, ctypes.byref(cc_major), ctypes.byref(cc_minor))
     if status != NVMLReturn.NVML_SUCCESS:
         raise NVIDIAVirtualPackageError(
-            f"Failed to get device compute capability: {status}"
+            f"Failed to get device compute capability: {_error_string(library, status)}"
         )
     return cc_major.value, cc_minor.value
 
@@ -189,19 +252,19 @@ def device_get_compute_capability(library: DLL, index: int) -> tuple[int, int]:
 def probe() -> CUDASystemInfo:
     """Query NVML in-process.
 
-    Raises if no usable driver is found. The device list is empty if the devices cannot be
-    queried, so that the driver version is still reported.
+    Raises if no usable driver is found. Devices that cannot be queried are skipped, so the
+    driver version and the remaining devices are still reported.
     """
     library = init_nvml()
     try:
         version = system_get_cuda_driver_version(library)
-        try:
-            capabilities = [
-                device_get_compute_capability(library, index)
-                for index in range(device_get_count(library))
-            ]
-        except Exception:
-            capabilities = []
+        count = 0
+        with contextlib.suppress(Exception):
+            count = device_get_count(library)
+        capabilities = []
+        for index in range(count):
+            with contextlib.suppress(NVIDIAVirtualPackageError):
+                capabilities.append(device_get_compute_capability(library, index))
     finally:
         shutdown_nvml(library)
     return CUDASystemInfo(version, capabilities)

@@ -52,7 +52,10 @@ def spawned(monkeypatch):
     context = multiprocessing.get_context("spawn")
 
     class Process:
+        exitcode = 0
+
         def __init__(self, target, args, **kwargs):
+            self.target, self.args = target, args
             modules.append(args[1])
 
         def start(self):
@@ -60,6 +63,9 @@ def spawned(monkeypatch):
 
         def join(self, timeout):
             pass
+
+        def is_alive(self):
+            return False
 
         def kill(self):
             pass
@@ -93,3 +99,30 @@ def test_detect_unknown_method_uses_driver(monkeypatch, spawned):
     with pytest.warns(UserWarning, match="Unknown CUDA detection method"):
         assert detection.detect() is None
     assert spawned == ["nvidia_virtual_packages.cuda._driver"]
+
+
+def test_detect_logs_failure_reason(monkeypatch, spawned, caplog):
+    """The reason detection failed in the child is logged in the parent."""
+    import multiprocessing
+
+    from nvidia_virtual_packages.cuda import _nvml
+
+    def not_loaded():
+        raise _nvml.NVIDIAVirtualPackageError(
+            "Failed to initialize NVML: NVML_ERROR_DRIVER_NOT_LOADED: Driver Not Loaded (9)"
+        )
+
+    # Run the detector target in this process instead of spawning a child.
+    Process = multiprocessing.get_context("spawn").Process
+    monkeypatch.setattr(Process, "start", lambda self: self.target(*self.args))
+    monkeypatch.setattr(_nvml, "init_nvml", not_loaded)
+    monkeypatch.setenv("NVIDIA_VIRTUAL_PACKAGES_DETECTION", "nvml")
+    with caplog.at_level("DEBUG", logger=detection.__name__):
+        assert detection.detect() is None
+    assert "NVML_ERROR_DRIVER_NOT_LOADED: Driver Not Loaded (9)" in caplog.text
+
+
+def test_detect_logs_missing_result(spawned, caplog):
+    with caplog.at_level("DEBUG", logger=detection.__name__):
+        assert detection.detect() is None
+    assert "exited with code 0 and no result" in caplog.text

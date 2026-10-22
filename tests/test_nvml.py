@@ -88,6 +88,35 @@ def test_probe_reports_driver_without_devices(monkeypatch, shutdowns):
     assert len(shutdowns) == 1
 
 
+def test_probe_skips_failing_devices(monkeypatch, shutdowns):
+    def capability(library, index):
+        if index == 1:
+            raise _nvml.NVIDIAVirtualPackageError("no permission")
+        return [(9, 0), None, (7, 5)][index]
+
+    monkeypatch.setattr(
+        _nvml, "system_get_cuda_driver_version", lambda library: (12, 4)
+    )
+    monkeypatch.setattr(_nvml, "device_get_count", lambda library: 3)
+    monkeypatch.setattr(_nvml, "device_get_compute_capability", capability)
+    assert _nvml.probe() == CUDASystemInfo((12, 4), [(9, 0), (7, 5)])
+    assert len(shutdowns) == 1
+
+
+def test_probe_raises_unexpected_device_errors(monkeypatch, shutdowns):
+    def broken(library, index):
+        raise TypeError("bad signature")
+
+    monkeypatch.setattr(
+        _nvml, "system_get_cuda_driver_version", lambda library: (12, 4)
+    )
+    monkeypatch.setattr(_nvml, "device_get_count", lambda library: 1)
+    monkeypatch.setattr(_nvml, "device_get_compute_capability", broken)
+    with pytest.raises(TypeError):
+        _nvml.probe()
+    assert len(shutdowns) == 1
+
+
 def test_probe_shuts_down_after_error(monkeypatch, shutdowns):
     def no_version(library):
         raise _nvml.NVIDIAVirtualPackageError("no version")
@@ -105,3 +134,24 @@ def test_function_falls_back_to_older_symbol():
     assert _nvml._function(Library(), "nvmlInit_v2", "nvmlInit") == "v1"
     with pytest.raises(_nvml.NVIDIAVirtualPackageError):
         _nvml._function(Library(), "nvmlShutdown")
+
+
+def test_device_get_compute_capability_without_symbol():
+    class Library:
+        nvmlDeviceGetHandleByIndex_v2 = staticmethod(lambda index, handle: 0)
+
+    with pytest.raises(_nvml.NVIDIAVirtualPackageError):
+        _nvml.device_get_compute_capability(Library(), 0)
+
+
+def test_error_string():
+    class Library:
+        nvmlErrorString = staticmethod(lambda status: b"Driver Not Loaded")
+
+    assert (
+        _nvml._error_string(Library(), 9)
+        == "NVML_ERROR_DRIVER_NOT_LOADED: Driver Not Loaded (9)"
+    )
+    # Without nvmlErrorString, fall back to the name, then the number.
+    assert _nvml._error_string(object(), 9) == "NVML_ERROR_DRIVER_NOT_LOADED (9)"
+    assert _nvml._error_string(object(), 12345) == "12345"

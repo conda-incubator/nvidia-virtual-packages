@@ -35,29 +35,35 @@ class CUDASystemInfo(typing.NamedTuple):
 
     #: The newest CUDA version supported by the driver, as ``(major, minor)``.
     driver_version: tuple[int, int]
-    #: The compute capability of every device on the system, as ``(major, minor)``, regardless
-    #: of any device visibility settings; empty if none were found.
+    #: The compute capability of every device on the system that could be queried, as
+    #: ``(major, minor)``, regardless of any device visibility settings; empty if none were
+    #: found.
     compute_capabilities: list[tuple[int, int]]
 
 
 def _detector_target(
-    queue: multiprocessing.queues.SimpleQueue[CUDASystemInfo | None], module: str
+    queue: multiprocessing.queues.SimpleQueue[CUDASystemInfo | str], module: str
 ) -> None:
-    """Run the detection method in ``module`` in the child process; put the result on ``queue``."""
+    """Run the detection method in ``module`` in the child process; put the result on ``queue``.
+
+    If detection fails, the reason is put on ``queue`` instead, so the parent can log it.
+    """
     try:
         import importlib
 
         queue.put(importlib.import_module(module).probe())
-    except Exception:
-        queue.put(None)
+    except Exception as e:
+        queue.put(f"{type(e).__name__}: {e}")
 
 
 @functools.cache
 def detect() -> CUDASystemInfo | None:
     """Return the CUDA capabilities of the system, or ``None`` if no usable driver is found.
 
-    The result is cached, so detection runs at most once per process.
+    The result is cached, so detection runs at most once per process. Why detection failed is
+    logged at the debug level, which conda shows with ``-vvv``.
     """
+    import logging
     import multiprocessing
     import os
     import platform
@@ -96,9 +102,22 @@ def detect() -> CUDASystemInfo | None:
     try:
         detector.start()
         detector.join(timeout=60.0)
+        timed_out = detector.is_alive()
     finally:
         detector.kill()
+    log = logging.getLogger(__name__)
     if queue.empty():
+        if timed_out:
+            log.debug("CUDA detection (%s) timed out", method)
+        else:
+            log.debug(
+                "CUDA detection (%s) exited with code %s and no result",
+                method,
+                detector.exitcode,
+            )
         return None
-    result: CUDASystemInfo | None = queue.get()
+    result: CUDASystemInfo | str = queue.get()
+    if isinstance(result, str):
+        log.debug("CUDA detection (%s) failed: %s", method, result)
+        return None
     return result
