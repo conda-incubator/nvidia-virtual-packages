@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
-"""Define a virtual package exposing the arch of CUDA devices on the system.
-
-This implementation uses ctypes to call the CUDA driver API.
+"""Define a virtual package exposing the minimum arch of CUDA devices on the system.
 
 # Specification
+
+From CEP 46 (https://github.com/conda/ceps/blob/main/cep-0046.md):
 
 Implementing the `__cuda_arch` virtual package is RECOMMENDED. If a conda-compatible client
 chooses to implement the `__cuda_arch` virtual package, it MUST follow these specifications:
@@ -34,143 +34,43 @@ If the `CONDA_OVERRIDE_CUDA_ARCH` environment variable is set to the empty strin
 
 from __future__ import annotations
 
-import enum
-import functools
 import os
-import typing
 
-from conda import plugins
-
-# ctypes, re, and warnings are imported lazily inside the functions that use them to keep
-# plugin import time low; most invocations never need all of them.
-if typing.TYPE_CHECKING:
-    import ctypes
-
-    # WinDLL only exists on Windows; use a type alias based on platform so annotations work everywhere.
-    if os.name == "nt":
-        DLL: typing.TypeAlias = ctypes.WinDLL  # type: ignore
-    else:
-        DLL: typing.TypeAlias = ctypes.CDLL  # type: ignore
+from nvidia_virtual_packages.cuda.detection import detect
+from nvidia_virtual_packages.cuda.version import get_cuda_version
 
 
-class CUresult(enum.IntEnum):
-    CUDA_SUCCESS = 0
+def _get_override(name: str) -> str | None:
+    """Return the override for virtual package ``name``, as conda resolves it.
+
+    Like ``CondaVirtualPackage.to_virtual_package``, the ``CONDA_OVERRIDE_<NAME>`` environment
+    variable takes precedence over ``override_virtual_packages`` in the conda configuration.
+    """
+    value = os.getenv(f"CONDA_OVERRIDE_{name.upper()}")
+    if value is None:
+        from conda.base.context import context
+
+        if context.override_virtual_packages:
+            value = context.override_virtual_packages.get(name)
+    return None if value is None else value.strip()
 
 
-class CUdevice_attribute(enum.IntEnum):
-    CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR = 75
-    CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR = 76
+def get_minimum_sm():
+    """Try to detect the minimum SM of CUDA devices on the system.
 
+    Returns NULL (rather than None) when ``__cuda_arch`` must be absent, so that conda's
+    ``to_virtual_package`` drops it; conda calls this lazily, only when it is needed.
+    """
+    from conda.auxlib import NULL
 
-class NVIDIAVirtualPackageError(RuntimeError):
-    """A unique RuntimeError for NVIDIA virtual package errors, so we can catch errors specific to this plugin."""
+    cuda_override = _get_override("cuda")
+    if cuda_override == "":
+        return NULL
 
-
-def init_driver() -> DLL:
-    """Initialize the CUDA driver API"""
-    import ctypes
-    import ctypes.util
-
-    if os.name == "nt":
-        library_path = ctypes.util.find_library("nvcuda")
-        if library_path is None:
-            raise NVIDIAVirtualPackageError("Failed to find nvcuda library")
-        library = ctypes.WinDLL(library_path)  # type: ignore[unused-ignore,attr-defined]
-    elif os.name == "posix":
-        library_path = ctypes.util.find_library("cuda")
-        if library_path is None:
-            raise NVIDIAVirtualPackageError("Failed to find cuda library")
-        library = ctypes.CDLL(library_path)  # type: ignore[unused-ignore,attr-defined]
-    else:
-        raise NVIDIAVirtualPackageError(f"Unsupported OS: {os.name}")
-
-    library.cuDriverGetVersion.argtypes = [ctypes.POINTER(ctypes.c_int)]
-    library.cuDriverGetVersion.restype = ctypes.c_int
-    library.cuInit.argtypes = [ctypes.c_uint]
-    library.cuInit.restype = ctypes.c_int
-    library.cuDeviceGetCount.argtypes = [ctypes.POINTER(ctypes.c_int)]
-    library.cuDeviceGetCount.restype = ctypes.c_int
-    library.cuDeviceGetAttribute.argtypes = [
-        ctypes.POINTER(ctypes.c_int),
-        ctypes.c_int,
-        ctypes.c_int,
-    ]
-    library.cuDeviceGetAttribute.restype = ctypes.c_int
-
-    status = library.cuInit(0)
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to initialize CUDA driver: {status}")
-
-    return library
-
-
-def driver_get_version(library: DLL) -> tuple[int, int]:
-    """Return the driver version as a tuple of (major, minor)"""
-    import ctypes
-
-    driver_version = ctypes.c_int(0)
-    status = library.cuDriverGetVersion(ctypes.byref(driver_version))
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to get CUDA driver version: {status}")
-    major = int(driver_version.value / 1000)
-    minor = (driver_version.value % 1000) // 10
-    return major, minor
-
-
-def device_get_count(library: DLL) -> int:
-    """Return the number of CUDA devices"""
-    import ctypes
-
-    device_count = ctypes.c_int(0)
-    status = library.cuDeviceGetCount(ctypes.byref(device_count))
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(f"Failed to get CUDA device count: {status}")
-    return device_count.value
-
-
-def device_get_attributes(library: DLL, device: int) -> tuple[int, int]:
-    """Return a tuple of (cc_major, cc_minor)"""
-    import ctypes
-
-    cc_major = ctypes.c_int(0)
-    cc_minor = ctypes.c_int(0)
-    status = library.cuDeviceGetAttribute(
-        ctypes.byref(cc_major),
-        CUdevice_attribute.CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MAJOR,
-        device,
-    )
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(
-            f"Failed to get CUDA device compute capability: {status}"
-        )
-    status = library.cuDeviceGetAttribute(
-        ctypes.byref(cc_minor),
-        CUdevice_attribute.CU_DEVICE_ATTRIBUTE_COMPUTE_CAPABILITY_MINOR,
-        device,
-    )
-    if status != CUresult.CUDA_SUCCESS:
-        raise NVIDIAVirtualPackageError(
-            f"Failed to get CUDA device compute capability: {status}"
-        )
-    return cc_major.value, cc_minor.value
-
-
-@functools.cache
-def get_minimum_sm() -> tuple[str | None, str | None]:
-    """Try to detect the minimum SM of CUDA devices on the system."""
-
-    if (
-        "CONDA_OVERRIDE_CUDA" in os.environ
-        and os.environ["CONDA_OVERRIDE_CUDA"].strip() == ""
-    ):
-        return None, None
-
-    default_name = "0"
-
-    if "CONDA_OVERRIDE_CUDA_ARCH" in os.environ:
-        override = os.environ["CONDA_OVERRIDE_CUDA_ARCH"].strip()
+    override = _get_override("cuda_arch")
+    if override is not None:
         if override == "":
-            return None, None
+            return NULL
         import re
 
         if not re.fullmatch(r"[0-9]+\.[0-9]+", override):
@@ -181,54 +81,23 @@ def get_minimum_sm() -> tuple[str | None, str | None]:
                 f"The __cuda_arch virtual package will not be created. "
                 f"Overrides must be of the form: CONDA_OVERRIDE_CUDA_ARCH=0.1"
             )
-            return None, None
+            return NULL
         # __cuda must be present for __cuda_arch to be exposed. If the user has asserted
-        # CUDA via CONDA_OVERRIDE_CUDA, trust them; otherwise require a real driver.
-        if "CONDA_OVERRIDE_CUDA" not in os.environ:
-            try:
-                init_driver()
-            except NVIDIAVirtualPackageError:
-                import warnings
+        # CUDA via CONDA_OVERRIDE_CUDA, trust them; otherwise __cuda must be detected.
+        if cuda_override is None and get_cuda_version() is NULL:
+            import warnings
 
-                warnings.warn(
-                    f"CONDA_OVERRIDE_CUDA_ARCH is set ({override}), but neither the CUDA driver "
-                    f"or CONDA_OVERRIDE_CUDA were detected. "
-                    f"The __cuda_arch virtual package will not be created."
-                )
-                return None, None
-        return override, default_name
+            warnings.warn(
+                f"CONDA_OVERRIDE_CUDA_ARCH is set ({override}), but neither the CUDA driver "
+                f"or CONDA_OVERRIDE_CUDA were detected. "
+                f"The __cuda_arch virtual package will not be created."
+            )
+            return NULL
+        return override
 
-    library = init_driver()
+    result = detect()
+    if result is None or not result.compute_capabilities:
+        return NULL
 
-    device_count = device_get_count(library)
-    if device_count == 0:
-        return None, None
-
-    minimum_sm_major: int = 999
-    minimum_sm_minor: int = 999
-    for device in range(device_count):
-        compute_capability_major, compute_capability_minor = device_get_attributes(
-            library, device
-        )
-        if (compute_capability_major, compute_capability_minor) < (
-            minimum_sm_major,
-            minimum_sm_minor,
-        ):
-            minimum_sm_major = compute_capability_major
-            minimum_sm_minor = compute_capability_minor
-
-    return f"{minimum_sm_major}.{minimum_sm_minor}", default_name
-
-
-@plugins.hookimpl
-def conda_virtual_packages():
-    try:
-        minimum_sm, device_model_name = get_minimum_sm()
-    except NVIDIAVirtualPackageError:
-        minimum_sm, device_model_name = None, None
-    if minimum_sm is not None and device_model_name is not None:
-        # According to CEP-26, we should only create the virtual package if we can
-        # detect the driver and devices
-        yield plugins.types.CondaVirtualPackage(
-            name="cuda_arch", version=minimum_sm, build=device_model_name
-        )
+    minimum_sm_major, minimum_sm_minor = min(result.compute_capabilities)
+    return f"{minimum_sm_major}.{minimum_sm_minor}"

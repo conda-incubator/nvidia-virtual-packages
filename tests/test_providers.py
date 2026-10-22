@@ -1,0 +1,115 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+import pytest
+
+from conda.plugins import manager
+from conda.plugins.virtual_packages import cuda as builtin_cuda
+
+from nvidia_virtual_packages.cuda import arch, plugin, version
+from nvidia_virtual_packages.cuda.detection import CUDASystemInfo
+
+DETECTED = CUDASystemInfo((12, 4), [(9, 0), (8, 0)])
+
+
+@pytest.fixture
+def records(monkeypatch):
+    """Return a function that builds the virtual package records with a fake detector."""
+    for name in ("CONDA_OVERRIDE_CUDA", "CONDA_OVERRIDE_CUDA_ARCH"):
+        monkeypatch.delenv(name, raising=False)
+
+    def builtin_probe():
+        raise AssertionError("conda's built-in __cuda probe must not run")
+
+    monkeypatch.setattr(builtin_cuda, "cuda_version", builtin_probe)
+
+    def build(detected=DETECTED):
+        calls = []
+
+        def fake_detect():
+            calls.append(1)
+            return detected
+
+        monkeypatch.setattr(version, "detect", fake_detect)
+        monkeypatch.setattr(arch, "detect", fake_detect)
+        for cached in (builtin_cuda.cached_cuda_version, manager.get_plugin_manager):
+            cached.cache_clear()
+        pm = manager.get_plugin_manager()
+        pm.load_plugins(plugin)  # no-op when already loaded via entry points
+        found = {r.name: r for r in pm.get_virtual_package_records()}
+        return found, calls
+
+    yield build
+    manager.get_plugin_manager.cache_clear()
+
+
+def test_replaces_builtin_cuda(records):
+    found, _ = records()
+    assert found["__cuda"].version == "12.4"
+    assert found["__cuda"].build == "0"
+    assert found["__cuda_arch"].version == "8.0"
+
+
+def test_no_driver(records):
+    found, _ = records(detected=None)
+    assert "__cuda" not in found
+    assert "__cuda_arch" not in found
+
+
+def test_no_devices(records):
+    found, _ = records(detected=CUDASystemInfo((12, 4), []))
+    assert found["__cuda"].version == "12.4"
+    assert "__cuda_arch" not in found
+
+
+def test_overrides_skip_detection(records, monkeypatch):
+    monkeypatch.setenv("CONDA_OVERRIDE_CUDA", "12.0")
+    monkeypatch.setenv("CONDA_OVERRIDE_CUDA_ARCH", "7.5")
+    found, calls = records()
+    assert found["__cuda"].version == "12.0"
+    assert found["__cuda_arch"].version == "7.5"
+    assert not calls
+
+
+def test_empty_cuda_override_hides_both(records, monkeypatch):
+    monkeypatch.setenv("CONDA_OVERRIDE_CUDA", "")
+    found, calls = records()
+    assert "__cuda" not in found
+    assert "__cuda_arch" not in found
+    assert not calls
+
+
+@pytest.fixture
+def config_overrides(monkeypatch):
+    """Set ``override_virtual_packages`` as if it came from the conda configuration."""
+    from conda.base.context import context
+
+    def set_overrides(overrides):
+        monkeypatch.setattr(
+            type(context), "override_virtual_packages", property(lambda self: overrides)
+        )
+
+    return set_overrides
+
+
+def test_config_overrides(records, config_overrides):
+    config_overrides({"cuda": "12.0", "cuda_arch": "7.5"})
+    found, calls = records()
+    assert found["__cuda"].version == "12.0"
+    assert found["__cuda_arch"].version == "7.5"
+    assert not calls
+
+
+def test_empty_config_cuda_override_hides_both(records, config_overrides):
+    config_overrides({"cuda": ""})
+    found, calls = records()
+    assert "__cuda" not in found
+    assert "__cuda_arch" not in found
+    assert not calls
+
+
+def test_arch_override_requires_cuda(records, monkeypatch):
+    monkeypatch.setenv("CONDA_OVERRIDE_CUDA_ARCH", "7.5")
+    with pytest.warns(UserWarning, match="CONDA_OVERRIDE_CUDA_ARCH is set"):
+        found, _ = records(detected=None)
+    assert "__cuda" not in found
+    assert "__cuda_arch" not in found

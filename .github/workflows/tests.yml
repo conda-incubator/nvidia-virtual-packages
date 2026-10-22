@@ -1,0 +1,54 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    # A login shell activates the conda environment created by setup-miniconda.
+    shell: bash -el {0}
+
+# GitHub-hosted runners have no NVIDIA driver or device, so the tests must not need one: the
+# benchmarks skip, and the virtual package tests use a fake detector or overrides.
+jobs:
+  tests:
+    name: Tests (${{ matrix.os }}, Python ${{ matrix.versions.python }}, conda ${{ matrix.versions.conda }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        # The oldest supported Python and conda, and the newest of both.
+        versions:
+          - { python: "3.11", conda: "25.11" }
+          - { python: "3.13", conda: "*" }
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # setuptools-scm derives the package version from the git history.
+          fetch-depth: 0
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-version: latest
+          activate-environment: test
+          python-version: ${{ matrix.versions.python }}
+          conda-remove-defaults: true
+
+      - name: Install conda and the plugin
+        run: |
+          conda install --yes "conda=${{ matrix.versions.conda }}"
+          python -m pip install -e ".[test]"
+
+      - name: Run tests
+        run: python -m pytest tests
+
+  upstream:
+    uses: ./.github/workflows/upstream.yml

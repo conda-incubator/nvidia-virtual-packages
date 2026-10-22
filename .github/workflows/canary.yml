@@ -1,0 +1,15 @@
+name: Canary
+
+# Test against conda's latest development build, to catch upstream changes before they are
+# released. Not run on pull requests, so that breakage on conda's main branch does not block them.
+on:
+  schedule:
+    # Mondays at 06:00 UTC.
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+jobs:
+  upstream:
+    uses: ./.github/workflows/upstream.yml
+    with:
+      canary: true

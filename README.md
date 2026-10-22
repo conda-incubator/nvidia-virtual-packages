@@ -12,6 +12,12 @@ represents to conda the CUDA *driver* version available on the system, this plug
 the virtual package `__cuda_arch`, which constrains the `cuda-arch` metapackage, which
 represents to conda the minimum compute capability of all CUDA *devices* on the system.
 
+This plugin also replaces conda's built-in `__cuda` virtual package, so that both virtual
+packages share one detection of the CUDA driver. It requires conda 25.11 or newer, the first
+release whose virtual package plugins can defer detection until conda needs the result; with
+older conda, the built-in `__cuda` detection would always run and the driver would be
+initialized twice.
+
 ## The `cuda-arch` metapackage
 
 Recipes and packages should not depend on a specific version of `__cuda` or `__cuda_arch`
