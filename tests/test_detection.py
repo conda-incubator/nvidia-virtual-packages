@@ -41,3 +41,88 @@ def test_detect_skips_apple_silicon(monkeypatch):
     monkeypatch.setattr("platform.machine", lambda: "arm64")
     monkeypatch.setattr("multiprocessing.get_context", no_spawn)
     assert detection.detect() is None
+
+
+@pytest.fixture
+def spawned(monkeypatch):
+    """Record the method module that detect() passes to the child, without spawning."""
+    import multiprocessing
+
+    modules = []
+    context = multiprocessing.get_context("spawn")
+
+    class Process:
+        exitcode = 0
+
+        def __init__(self, target, args, **kwargs):
+            self.target, self.args = target, args
+            modules.append(args[1])
+
+        def start(self):
+            pass
+
+        def join(self, timeout):
+            pass
+
+        def is_alive(self):
+            return False
+
+        def kill(self):
+            pass
+
+    monkeypatch.setattr(context, "Process", Process)
+    monkeypatch.setattr("multiprocessing.get_context", lambda method: context)
+    monkeypatch.setattr("platform.machine", lambda: "x86_64")
+    return modules
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [
+        (None, "nvidia_virtual_packages.cuda._driver"),
+        ("", "nvidia_virtual_packages.cuda._driver"),
+        ("driver", "nvidia_virtual_packages.cuda._driver"),
+        (" NVML ", "nvidia_virtual_packages.cuda._nvml"),
+    ],
+)
+def test_detect_selects_method(monkeypatch, spawned, value, expected):
+    if value is None:
+        monkeypatch.delenv("NVIDIA_VIRTUAL_PACKAGES_DETECTION", raising=False)
+    else:
+        monkeypatch.setenv("NVIDIA_VIRTUAL_PACKAGES_DETECTION", value)
+    assert detection.detect() is None
+    assert spawned == [expected]
+
+
+def test_detect_unknown_method_uses_driver(monkeypatch, spawned):
+    monkeypatch.setenv("NVIDIA_VIRTUAL_PACKAGES_DETECTION", "bogus")
+    with pytest.warns(UserWarning, match="Unknown CUDA detection method"):
+        assert detection.detect() is None
+    assert spawned == ["nvidia_virtual_packages.cuda._driver"]
+
+
+def test_detect_logs_failure_reason(monkeypatch, spawned, caplog):
+    """The reason detection failed in the child is logged in the parent."""
+    import multiprocessing
+
+    from nvidia_virtual_packages.cuda import _nvml
+
+    def not_loaded():
+        raise _nvml.NVIDIAVirtualPackageError(
+            "Failed to initialize NVML: NVML_ERROR_DRIVER_NOT_LOADED: Driver Not Loaded (9)"
+        )
+
+    # Run the detector target in this process instead of spawning a child.
+    Process = multiprocessing.get_context("spawn").Process
+    monkeypatch.setattr(Process, "start", lambda self: self.target(*self.args))
+    monkeypatch.setattr(_nvml, "init_nvml", not_loaded)
+    monkeypatch.setenv("NVIDIA_VIRTUAL_PACKAGES_DETECTION", "nvml")
+    with caplog.at_level("DEBUG", logger=detection.__name__):
+        assert detection.detect() is None
+    assert "NVML_ERROR_DRIVER_NOT_LOADED: Driver Not Loaded (9)" in caplog.text
+
+
+def test_detect_logs_missing_result(spawned, caplog):
+    with caplog.at_level("DEBUG", logger=detection.__name__):
+        assert detection.detect() is None
+    assert "exited with code 0 and no result" in caplog.text

@@ -2,21 +2,17 @@
 # SPDX-License-Identifier: BSD-3-Clause
 import logging
 
-from nvidia_virtual_packages.cuda._ctypes import (
-    device_get_attributes,
-    device_get_count,
-    driver_get_version,
-    init_driver,
-)
+from nvidia_virtual_packages.cuda.detection import detect
 
 logger = logging.getLogger(__name__)
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
-    library = init_driver()
-    logger.debug("Found library: %s", library._name)
-    logger.debug("Driver version: %s", driver_get_version(library))
-    device_count = device_get_count(library)
-    logger.info("Device count: %s", device_count)
-    for device in range(device_count):
-        logger.info("Device %s: %s", device, device_get_attributes(library, device))
+    result = detect()
+    if result is None:
+        logger.info("No usable CUDA driver found")
+    else:
+        logger.info("Driver version: %s", result.driver_version)
+        logger.info("Device count: %s", len(result.compute_capabilities))
+        for device, capability in enumerate(result.compute_capabilities):
+            logger.info("Device %s: %s", device, capability)

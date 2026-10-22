@@ -18,6 +18,9 @@ release whose virtual package plugins can defer detection until conda needs the 
 older conda, the built-in `__cuda` detection would always run and the driver would be
 initialized twice.
 
+Detection uses the CUDA driver API by default. Set `NVIDIA_VIRTUAL_PACKAGES_DETECTION=nvml` to
+use the NVIDIA Management Library (NVML) instead.
+
 ## The `cuda-arch` metapackage
 
 Recipes and packages should not depend on a specific version of `__cuda` or `__cuda_arch`
