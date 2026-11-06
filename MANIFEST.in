@@ -1,2 +1,5 @@
 # Exclude archival file from development builds
 exclude .git_archival.txt
+
+# Tests of the shared detection package live inside it; do not ship them
+prune src/nvidia_virtual_packages/cuda/detection/tests

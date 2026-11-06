@@ -1,11 +1,21 @@
 # SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
+import typing
+
 import os
 
 import pytest
 
-from nvidia_virtual_packages.cuda import _nvml
-from nvidia_virtual_packages.cuda.detection import CUDASystemInfo
+from .. import _nvml
+from .._info import CUDASystemInfo
+
+if typing.TYPE_CHECKING:
+    import ctypes
+
+
+def fake_dll(fake: object) -> "ctypes.CDLL":
+    """Pass a test double where the code under test expects a loaded library."""
+    return typing.cast("ctypes.CDLL", fake)
 
 
 @pytest.mark.parametrize(
@@ -55,7 +65,7 @@ def test_candidate_library_names(monkeypatch, system, expected):
 @pytest.fixture
 def shutdowns(monkeypatch):
     """Fake NVML initialization, and record each shutdown."""
-    calls = []
+    calls: list[object] = []
     monkeypatch.setattr(_nvml, "init_nvml", object)
     monkeypatch.setattr(_nvml, "shutdown_nvml", calls.append)
     return calls
@@ -131,9 +141,9 @@ def test_function_falls_back_to_older_symbol():
     class Library:
         nvmlInit = "v1"
 
-    assert _nvml._function(Library(), "nvmlInit_v2", "nvmlInit") == "v1"
+    assert _nvml._function(fake_dll(Library()), "nvmlInit_v2", "nvmlInit") == "v1"
     with pytest.raises(_nvml.NVIDIAVirtualPackageError):
-        _nvml._function(Library(), "nvmlShutdown")
+        _nvml._function(fake_dll(Library()), "nvmlShutdown")
 
 
 def test_device_get_compute_capability_without_symbol():
@@ -141,7 +151,7 @@ def test_device_get_compute_capability_without_symbol():
         nvmlDeviceGetHandleByIndex_v2 = staticmethod(lambda index, handle: 0)
 
     with pytest.raises(_nvml.NVIDIAVirtualPackageError):
-        _nvml.device_get_compute_capability(Library(), 0)
+        _nvml.device_get_compute_capability(fake_dll(Library()), 0)
 
 
 def test_error_string():
@@ -149,9 +159,11 @@ def test_error_string():
         nvmlErrorString = staticmethod(lambda status: b"Driver Not Loaded")
 
     assert (
-        _nvml._error_string(Library(), 9)
+        _nvml._error_string(fake_dll(Library()), 9)
         == "NVML_ERROR_DRIVER_NOT_LOADED: Driver Not Loaded (9)"
     )
     # Without nvmlErrorString, fall back to the name, then the number.
-    assert _nvml._error_string(object(), 9) == "NVML_ERROR_DRIVER_NOT_LOADED (9)"
-    assert _nvml._error_string(object(), 12345) == "12345"
+    assert (
+        _nvml._error_string(fake_dll(object()), 9) == "NVML_ERROR_DRIVER_NOT_LOADED (9)"
+    )
+    assert _nvml._error_string(fake_dll(object()), 12345) == "12345"

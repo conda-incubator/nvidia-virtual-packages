@@ -41,6 +41,11 @@ build-backend = "setuptools.build_meta"
 
 
 
+[tool.setuptools.packages.find]
+where = ["src"]
+# The tests of the shared detection package live inside it; do not ship them
+exclude = ["*.tests", "*.tests.*"]
+
 [tool.setuptools_scm]
 
 [tool.ruff]
@@ -159,6 +164,8 @@ norecursedirs =[
   "__pycache__",
   "upstream"  # conda's own tests; run them with tests/upstream/run.sh
 ]
+# Import tests inside src/ (the shared detection package) under their real dotted names:
+consider_namespace_packages = true
 doctest_optionflags = ["NUMBER", "NORMALIZE_WHITESPACE", "IGNORE_EXCEPTION_DETAIL"]
 timeout = 10
 bdd_features_base_dir = "features/"

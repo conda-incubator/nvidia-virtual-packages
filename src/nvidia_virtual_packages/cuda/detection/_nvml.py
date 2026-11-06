@@ -13,7 +13,7 @@ import contextlib
 import enum
 import typing
 
-from nvidia_virtual_packages.cuda.detection import CUDASystemInfo
+from ._info import CUDASystemInfo
 
 # ctypes is imported lazily inside the functions that use it to keep plugin import time low.
 if typing.TYPE_CHECKING:

@@ -1,8 +1,18 @@
 # SPDX-FileCopyrightText: Copyright (c) 2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: BSD-3-Clause
+import typing
+
 import pytest
 
-from nvidia_virtual_packages.cuda._driver import _candidate_library_names
+from .._driver import _candidate_library_names
+
+if typing.TYPE_CHECKING:
+    import ctypes
+
+
+def fake_dll(fake: object) -> "ctypes.CDLL":
+    """Pass a test double where the code under test expects a loaded library."""
+    return typing.cast("ctypes.CDLL", fake)
 
 
 @pytest.mark.parametrize(
@@ -45,8 +55,8 @@ def test_candidate_library_names(monkeypatch, system, expected):
 
 
 def test_probe_reports_driver_without_devices(monkeypatch):
-    from nvidia_virtual_packages.cuda import _driver
-    from nvidia_virtual_packages.cuda.detection import CUDASystemInfo
+    from .. import _driver
+    from .._info import CUDASystemInfo
 
     def no_devices(library):
         raise _driver.NVIDIAVirtualPackageError("no devices")
@@ -59,8 +69,8 @@ def test_probe_reports_driver_without_devices(monkeypatch):
 
 
 def test_probe_skips_failing_devices(monkeypatch):
-    from nvidia_virtual_packages.cuda import _driver
-    from nvidia_virtual_packages.cuda.detection import CUDASystemInfo
+    from .. import _driver
+    from .._info import CUDASystemInfo
 
     def attributes(library, device):
         if device == 1:
@@ -76,7 +86,7 @@ def test_probe_skips_failing_devices(monkeypatch):
 
 
 def test_error_string():
-    from nvidia_virtual_packages.cuda import _driver
+    from .. import _driver
 
     def returns(text):
         def function(status, value):
@@ -92,22 +102,26 @@ def test_error_string():
 
     # The driver's name is used even for codes that CUresult lacks.
     assert (
-        _driver._error_string(Library(), 800)
+        _driver._error_string(fake_dll(Library()), 800)
         == "CUDA_ERROR_NOT_PERMITTED: operation not permitted (800)"
     )
     # Without the driver's functions, fall back to CUresult, then the number.
-    assert _driver._error_string(object(), 100) == "CUDA_ERROR_NO_DEVICE (100)"
-    assert _driver._error_string(object(), 12345) == "12345"
+    assert (
+        _driver._error_string(fake_dll(object()), 100) == "CUDA_ERROR_NO_DEVICE (100)"
+    )
+    assert _driver._error_string(fake_dll(object()), 12345) == "12345"
 
 
 def test_error_string_before_init():
     """The driver describes no errors until cuInit succeeds, so cuInit's are named by CUresult."""
-    from nvidia_virtual_packages.cuda import _driver
+    from .. import _driver
 
     class Library:
         # CUDA_ERROR_NOT_INITIALIZED
         cuGetErrorName = staticmethod(lambda status, value: 3)
         cuGetErrorString = staticmethod(lambda status, value: 3)
 
-    assert _driver._error_string(Library(), 100) == "CUDA_ERROR_NO_DEVICE (100)"
-    assert _driver._error_string(Library(), 12345) == "12345"
+    assert (
+        _driver._error_string(fake_dll(Library()), 100) == "CUDA_ERROR_NO_DEVICE (100)"
+    )
+    assert _driver._error_string(fake_dll(Library()), 12345) == "12345"
