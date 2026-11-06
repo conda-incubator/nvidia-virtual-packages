@@ -48,7 +48,7 @@ jobs:
           python -m pip install -e ".[test]"
 
       - name: Run tests
-        run: python -m pytest tests
+        run: python -m pytest tests src/nvidia_virtual_packages/cuda/detection/tests
 
   upstream:
     uses: ./.github/workflows/upstream.yml

@@ -11,8 +11,8 @@ The policy around detection follows conda's built-in ``__cuda`` detector
 timeout, so a hung or crashing driver cannot take conda down, and Apple silicon is skipped.
 
 The method is chosen by the ``NVIDIA_VIRTUAL_PACKAGES_DETECTION`` environment variable:
-``driver`` (the default) uses the CUDA driver API (:func:`nvidia_virtual_packages.cuda._driver.probe`),
-and ``nvml`` uses NVML (:func:`nvidia_virtual_packages.cuda._nvml.probe`).
+``driver`` (the default) uses the CUDA driver API (:func:`._driver.probe`),
+and ``nvml`` uses NVML (:func:`._nvml.probe`).
 """
 
 from __future__ import annotations
@@ -24,10 +24,7 @@ if typing.TYPE_CHECKING:
     import multiprocessing.queues
 
 #: The modules implementing each detection method; each provides ``probe() -> CUDASystemInfo``.
-_METHODS = {
-    "driver": "nvidia_virtual_packages.cuda._driver",
-    "nvml": "nvidia_virtual_packages.cuda._nvml",
-}
+_METHODS = {"driver": f"{__package__}._driver", "nvml": f"{__package__}._nvml"}
 
 
 class CUDASystemInfo(typing.NamedTuple):
